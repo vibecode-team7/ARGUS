@@ -1,0 +1,11 @@
+# Ignore Claude files
+.claude
+
+# Ignore virtual environment, compiled files, and sensitive data
+venv/
+__pycache__/
+*.pyc
+backend/data/
+.env
+proposal.md
+presentation.md

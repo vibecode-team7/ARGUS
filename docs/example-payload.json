@@ -1,0 +1,43 @@
+{
+  "hostname": "dev-machine-01",
+  "os": "linux",
+  "os_version": "Ubuntu 22.04 LTS",
+  "kernel": "6.2.0-26-generic",
+  "agent_version": "0.1.0",
+  "scanned_at": "2025-07-05T14:30:00Z",
+  "uptime_seconds": 284000,
+  "ip_address": "192.168.1.42",
+  "findings": [
+    {
+      "category": "local_llm",
+      "name": "ollama",
+      "severity": "high",
+      "status": "detected",
+      "evidence": "Port 11434 open (PID 12345)",
+      "pid": 12345,
+      "port": 11434,
+      "user": "john",
+      "detected_at": "2025-07-05T14:29:55Z"
+    },
+    {
+      "category": "ai_ide",
+      "name": "cursor",
+      "severity": "medium",
+      "status": "detected",
+      "evidence": "Config found: /home/john/.cursor",
+      "path": "/home/john/.cursor",
+      "user": "john",
+      "detected_at": "2025-07-05T14:29:50Z"
+    },
+    {
+      "category": "mcp_server",
+      "name": "mcp_config",
+      "severity": "high",
+      "status": "detected",
+      "evidence": "MCP config found: /home/john/.mcp.json",
+      "path": "/home/john/.mcp.json",
+      "user": "john",
+      "detected_at": "2025-07-05T14:29:52Z"
+    }
+  ]
+}

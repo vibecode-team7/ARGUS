@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ARGUS Agent Payload",
+  "description": "Payload sent by all agents (Linux, macOS, Windows) to the backend API.",
+  "type": "object",
+  "required": ["hostname", "os", "os_version", "kernel", "agent_version", "scanned_at", "findings"],
+  "properties": {
+    "hostname": {
+      "type": "string",
+      "description": "Machine hostname. Example: dev-machine-01"
+    },
+    "os": {
+      "type": "string",
+      "enum": ["linux", "darwin", "windows"],
+      "description": "Operating system family."
+    },
+    "os_version": {
+      "type": "string",
+      "description": "Full OS version string. Example: Ubuntu 22.04 LTS, macOS 14.5, Windows 11 Pro"
+    },
+    "kernel": {
+      "type": "string",
+      "description": "Kernel or build version. Example: 6.2.0-26-generic, 23F79, 22631.2428"
+    },
+    "agent_version": {
+      "type": "string",
+      "description": "Agent script version (semver). Example: 0.1.0"
+    },
+    "scanned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when the scan ran. Example: 2025-07-05T14:30:00Z"
+    },
+    "uptime_seconds": {
+      "type": "integer",
+      "description": "System uptime in seconds at time of scan."
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "Internal IP address of the machine. Example: 192.168.1.42"
+    },
+    "findings": {
+      "type": "array",
+      "description": "List of detected Shadow AI findings. Empty array if nothing found.",
+      "items": {
+        "type": "object",
+        "required": ["category", "name", "severity", "status", "evidence", "detected_at"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["local_llm", "ai_ide", "mcp_server"],
+            "description": "Category of Shadow AI detection."
+          },
+          "name": {
+            "type": "string",
+            "description": "Specific tool name. Example: ollama, cursor, mcp_config"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Risk severity level."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["detected", "not_detected"],
+            "description": "Whether the tool was detected or confirmed absent."
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Human-readable evidence string shown on the dashboard. Example: Port 11434 open (PID 12345)"
+          },
+          "pid": {
+            "type": "integer",
+            "description": "Process ID of the detected tool (if applicable)."
+          },
+          "port": {
+            "type": "integer",
+            "description": "Network port of the detected tool (if applicable)."
+          },
+          "path": {
+            "type": "string",
+            "description": "File path of the detected config or directory (if applicable)."
+          },
+          "user": {
+            "type": "string",
+            "description": "Username who owns the process or file."
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp of when this specific finding was detected."
+          }
+        }
+      }
+    }
+  }
+}
