@@ -26,7 +26,7 @@ import requests
 # ── Configuration ─────────────────────────────────────────────────────
 
 BACKEND_URL = os.environ.get("ARGUS_BACKEND_URL", "http://localhost:8000")
-API_KEY = os.environ.get("ARGUS_API_KEY", "")
+API_KEY = os.environ.get("ARGUS_KEY_LINUX", "")
 AGENT_VERSION = "0.1.0"
 
 # MCP config file paths to search (relative to each user's home)
@@ -298,8 +298,8 @@ def send_scan(payload: dict) -> dict:
 
 def main():
     if not API_KEY:
-        print("ERROR: ARGUS_API_KEY environment variable is not set.")
-        print("  export ARGUS_API_KEY='your-write-key-here'")
+        print("ERROR: ARGUS_KEY_LINUX environment variable is not set.")
+        print("  export ARGUS_KEY_LINUX='your-write-key-here'")
         return 1
 
     print(f"ARGUS Linux Agent v{AGENT_VERSION}")
