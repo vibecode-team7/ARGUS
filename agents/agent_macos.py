@@ -262,7 +262,14 @@ def main():
     for f in payload["findings"]:
         print(f"  [{f['status']:12s}] {f['category']:12s} {f['name']:12s} {f['evidence']}")
 
-    response = send_payload(payload, server_url, api_key)
+    try:
+        response = send_payload(payload, server_url, api_key)
+    except requests.exceptions.Timeout:
+        raise SystemExit(f"\nFailed to submit scan: request to {server_url} timed out")
+    except requests.exceptions.ConnectionError as e:
+        raise SystemExit(f"\nFailed to submit scan: could not connect to {server_url} ({e})")
+    except requests.exceptions.RequestException as e:
+        raise SystemExit(f"\nFailed to submit scan: {e}")
 
     if response.ok:
         print(f"\nScan submitted: {response.json()}")
