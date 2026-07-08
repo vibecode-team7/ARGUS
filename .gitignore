@@ -9,3 +9,7 @@ backend/data/
 .env
 proposal.md
 presentation.md
+vpsenv.txt
+localtestresult.md
+vpstestresult.md
+vpstestresult.public.md

@@ -12,8 +12,6 @@
 ARGUS/
 ├── CLAUDE.md               ← This file
 ├── README.md               ← Team guide (start here)
-├── proposal.md             ← Project proposal
-├── presentation.md         ← Slide outline
 ├── backend/
 │   ├── main.py             ← FastAPI app, routes, Pydantic models
 │   ├── database.py         ← SQLAlchemy ORM, migrations, DB init
@@ -29,9 +27,14 @@ ARGUS/
 │   ├── payload-schema.json ← JSON Schema for agent payloads
 │   ├── example-payload.json
 │   ├── backend-plan.md     ← DB schema, API docs, testing guide
+│   ├── architecture.md     ← Mermaid diagrams: system, sequence, ERD, auth flow
 │   └── deployment-guide.md ← Docker multi-arch build, VPS deploy
+├── agents/
+│   └── agent_macos.py      ← macOS agent: detects Ollama, Cursor, MCP configs
 └── venv/                   ← Python 3.12 virtualenv (gitignored)
 ```
+
+**Not yet implemented**: `agents/agent_linux.py`, `agents/agent_windows.py`, and `dashboard/` are referenced throughout the docs and diagrams but don't exist in the repo yet. When building them, follow the Payload Contract below exactly — the backend already expects it.
 
 ---
 
@@ -295,6 +298,7 @@ docker exec <container-id> python seed.py
 - **Seed must run after first container start** — `python seed.py` inside container before API works
 - **`.env` is gitignored** — never commit it; only `.env.example` is in the repo
 - **Database lives in Docker volume `argus-data`** — deleting the container without the volume flag loses data
+- **`requirements.txt` is missing `python-dotenv`** — `seed.py` and `test_data.py` both `import dotenv`, but it's not pinned; install it manually (`pip install python-dotenv`) if seeding fails with `ModuleNotFoundError`
 
 ---
 
@@ -331,3 +335,4 @@ All agents send identical JSON to `POST /api/scan`. Full schema: `docs/payload-s
 - `uvicorn --reload` watches `backend/` for changes — good for rapid iteration
 - `seed.py` is idempotent — running it twice skips existing keys
 - `test_data.py` assumes `seed.py` has been run first
+- **No automated test suite or linter is configured yet** — verify changes by running the server and exercising endpoints with `curl` (see Quick Start), not by looking for a `pytest`/`ruff` command that doesn't exist
