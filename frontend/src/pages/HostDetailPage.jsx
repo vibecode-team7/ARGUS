@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router";
 import { ArrowLeft, Monitor, Laptop, ChevronDown, ChevronRight } from "lucide-react";
 import { useFindings } from "../hooks/useFindings";
@@ -22,9 +22,16 @@ export default function HostDetailPage() {
   const { data, loading, error, refetch } = useFindings({ hostname: decodedHostname, limit: 50 });
   const [expandedScan, setExpandedScan] = useState(null);
 
-  const scans = data?.scans ?? [];
+  const rawScans = data?.scans ?? [];
 
-  // Get host info from first scan
+  // Sort by received_at descending — API order (by id) doesn't track chronology,
+  // since scans can be ingested out of scanned_at order.
+  const scans = useMemo(
+    () => [...rawScans].sort((a, b) => new Date(b.received_at) - new Date(a.received_at)),
+    [rawScans]
+  );
+
+  // Get host info from the most recently received scan
   const hostInfo = scans[0] ?? null;
 
   if (error) return <ErrorState error={error} onRetry={refetch} />;

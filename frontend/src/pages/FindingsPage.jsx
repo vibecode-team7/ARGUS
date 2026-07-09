@@ -55,9 +55,17 @@ export default function FindingsPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
-  // Flatten findings from scans for display
+  // Flatten findings from scans for display.
+  // The API can return the same scan more than once when filtering by
+  // severity (it fans out on the findings join), so dedupe by scan id first.
   const allFindings = useMemo(() => {
-    return scans.flatMap((scan) =>
+    const seenScans = new Set();
+    const uniqueScans = scans.filter((scan) => {
+      if (seenScans.has(scan.id)) return false;
+      seenScans.add(scan.id);
+      return true;
+    });
+    return uniqueScans.flatMap((scan) =>
       scan.findings.map((f) => ({ ...f, scan }))
     );
   }, [scans]);
@@ -128,10 +136,12 @@ export default function FindingsPage() {
       {/* Page size selector */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-secondary">
-          {loading ? "Loading…" : `${total} finding${total !== 1 ? "s" : ""} total`}
+          {loading
+            ? "Loading…"
+            : `${allFindings.length} finding${allFindings.length !== 1 ? "s" : ""} from ${total} scan${total !== 1 ? "s" : ""}`}
         </p>
         <div className="flex items-center gap-2">
-          <label htmlFor="page-size" className="text-xs text-text-muted">Per page:</label>
+          <label htmlFor="page-size" className="text-xs text-text-muted">Scans per page:</label>
           <select
             id="page-size"
             value={limit}
@@ -202,7 +212,7 @@ export default function FindingsPage() {
             ) : (
               sorted.map((f) => (
                 <tr
-                  key={f.id}
+                  key={`${f.scan.id}-${f.id}`}
                   className="border-b border-border last:border-0 hover:bg-bg-secondary transition-colors cursor-pointer"
                   onClick={() => window.location.href = `/findings/${f.scan.id}`}
                 >

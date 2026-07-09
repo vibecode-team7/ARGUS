@@ -26,6 +26,17 @@ export default function DashboardPage() {
   const { data: findings, loading: findingsLoading, error: findingsError, refetch: refetchFindings } = useFindings({ limit: 10 });
 
   const recentHosts = useMemo(() => (hosts ?? []).slice(0, 5), [hosts]);
+  const recentFindings = useMemo(() => {
+    const seenScans = new Set();
+    const uniqueScans = (findings?.scans ?? []).filter((scan) => {
+      if (seenScans.has(scan.id)) return false;
+      seenScans.add(scan.id);
+      return true;
+    });
+    return uniqueScans
+      .flatMap((scan) => scan.findings.map((f) => ({ ...f, scan })))
+      .slice(0, 5);
+  }, [findings]);
 
   if (statsError || hostsError || findingsError) {
     return <ErrorState error={statsError ?? hostsError ?? findingsError} onRetry={() => { refetchStats(); refetchHosts(); refetchFindings(); }} />;
@@ -115,29 +126,27 @@ export default function DashboardPage() {
           <div className="divide-y divide-border">
             {findingsLoading ? (
               <div className="p-5"><SkeletonTable rows={5} /></div>
-            ) : !findings?.scans?.length ? (
+            ) : recentFindings.length === 0 ? (
               <EmptyState icon={FileWarning} title="No findings yet" description="No Shadow AI detected. All clear!" />
             ) : (
-              findings.scans.flatMap((scan) =>
-                scan.findings.map((f) => (
-                  <Link
-                    key={f.id}
-                    to={`/findings/${scan.id}`}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-bg-secondary transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium text-text-primary truncate">{f.name}</span>
-                        <CategoryBadge category={f.category} />
-                      </div>
-                      <p className="text-xs text-text-muted truncate">
-                        {scan.hostname} — {f.evidence}
-                      </p>
+              recentFindings.map((f) => (
+                <Link
+                  key={`${f.scan.id}-${f.id}`}
+                  to={`/findings/${f.scan.id}`}
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-bg-secondary transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm font-medium text-text-primary truncate">{f.name}</span>
+                      <CategoryBadge category={f.category} />
                     </div>
-                    <SeverityBadge severity={f.severity} />
-                  </Link>
-                ))
-              )
+                    <p className="text-xs text-text-muted truncate">
+                      {f.scan.hostname} — {f.evidence}
+                    </p>
+                  </div>
+                  <SeverityBadge severity={f.severity} />
+                </Link>
+              ))
             )}
           </div>
         </div>
