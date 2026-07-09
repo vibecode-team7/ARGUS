@@ -1,11 +1,12 @@
 import { NavLink } from "react-router";
-import { LayoutDashboard, Server, FileWarning, Shield } from "lucide-react";
+import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
 
 const NAV_ITEMS = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/hosts", icon: Server, label: "Hosts" },
   { to: "/findings", icon: FileWarning, label: "Findings" },
+  { to: "/trends", icon: TrendingUp, label: "Trends" },
 ];
 
 export default function Sidebar({ open, onClose }) {

@@ -37,3 +37,16 @@ export function formatDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString();
 }
+
+/**
+ * Format a date-only string ("YYYY-MM-DD") without shifting it across
+ * timezones — `new Date("YYYY-MM-DD")` parses as UTC midnight, which
+ * renders as the previous day in any timezone behind UTC.
+ * @param {string} dateOnly
+ * @returns {string}
+ */
+export function formatDayLabel(dateOnly) {
+  if (!dateOnly) return "—";
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString();
+}

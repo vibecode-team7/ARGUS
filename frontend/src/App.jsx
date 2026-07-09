@@ -7,6 +7,7 @@ const HostsPage = lazy(() => import("./pages/HostsPage"));
 const HostDetailPage = lazy(() => import("./pages/HostDetailPage"));
 const FindingsPage = lazy(() => import("./pages/FindingsPage"));
 const ScanDetailPage = lazy(() => import("./pages/ScanDetailPage"));
+const TrendsPage = lazy(() => import("./pages/TrendsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 function Loading() {
@@ -58,6 +59,14 @@ const App = () => {
           element={
             <Suspense fallback={<Loading />}>
               <ScanDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="trends"
+          element={
+            <Suspense fallback={<Loading />}>
+              <TrendsPage />
             </Suspense>
           }
         />

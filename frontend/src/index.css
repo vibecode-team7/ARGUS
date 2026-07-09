@@ -53,16 +53,16 @@
   --accent-hover: #6366f1;
   --accent-light: #1e1b4b;
 
-  --severity-high: #ff0000;
-  --severity-high-bg: #ff0000;
-  --severity-medium: #fcd34d;
-  --severity-medium-bg: #ff8234;
-  --severity-low: #00ff5e;
-  --severity-low-bg: #166534;
+  --severity-high: #dc2626;
+  --severity-high-bg: #ef4444;
+  --severity-medium: #d97706;
+  --severity-medium-bg: #f59e0b;
+  --severity-low: #16a34a;
+  --severity-low-bg: #22c55e;
 
-  --danger: #fca5a5;
-  --success: #86efac;
-  --warning: #fcd34d;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --warning: #d97706;
 
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);

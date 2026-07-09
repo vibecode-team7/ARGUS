@@ -135,3 +135,21 @@ export function fetchFindings({
 export function fetchScanDetail(scanId, { signal } = {}) {
   return request(`/api/findings/${scanId}`, { signal });
 }
+
+/**
+ * @typedef {Object} TrendsResponse
+ * @property {number} days
+ * @property {Array<{date: string, high: number, medium: number, low: number}>} findings
+ * @property {Array<{date: string, new_hosts: number}>} new_hosts
+ */
+
+/**
+ * GET /api/trends
+ * @param {{ days?: number, signal?: AbortSignal }} opts
+ * @returns {Promise<TrendsResponse>}
+ */
+export function fetchTrends({ days = 30, signal } = {}) {
+  const params = new URLSearchParams();
+  params.set("days", String(days));
+  return request(`/api/trends?${params}`, { signal });
+}
