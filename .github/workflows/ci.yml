@@ -69,5 +69,5 @@ jobs:
         if: ${{ hashFiles('backend/requirements.txt', 'pyproject.toml') != '' }}
         run: ruff check . || true    # ch-8: drop `|| true` to enforce
       - name: Test (pytest)
-        if: ${{ hashFiles('requirements.txt', 'pyproject.toml') != '' }}
+        if: ${{ hashFiles('backend/requirements.txt', 'pyproject.toml') != '' }}
         run: pytest -q || true       # ch-8: drop `|| true` to enforce
