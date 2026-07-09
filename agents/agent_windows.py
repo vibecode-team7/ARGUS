@@ -127,18 +127,22 @@ def scan_ollama(findings: list, now: str) -> None:
             continue
 
     # Process not found — check if port is listening (sidecar or service)
-    for conn in psutil.net_connections(kind="inet"):
-        if conn.laddr.port == OLLAMA_DEFAULT_PORT and conn.status == "LISTEN":
-            findings.append({
-                "category": "local_llm",
-                "name": "ollama",
-                "severity": "high",
-                "status": "detected",
-                "evidence": f"Port {OLLAMA_DEFAULT_PORT} listening (no process info)",
-                "port": OLLAMA_DEFAULT_PORT,
-                "detected_at": now,
-            })
-            return
+    # NOTE: psutil.net_connections() requires admin on Windows
+    try:
+        for conn in psutil.net_connections(kind="inet"):
+            if conn.laddr.port == OLLAMA_DEFAULT_PORT and conn.status == "LISTEN":
+                findings.append({
+                    "category": "local_llm",
+                    "name": "ollama",
+                    "severity": "high",
+                    "status": "detected",
+                    "evidence": f"Port {OLLAMA_DEFAULT_PORT} listening (no process info)",
+                    "port": OLLAMA_DEFAULT_PORT,
+                    "detected_at": now,
+                })
+                return
+    except psutil.AccessDenied:
+        pass
 
 
 
@@ -389,10 +393,10 @@ def parse_args() -> argparse.Namespace:
         "--json",
         metavar="FILE",
         nargs="?",
-        const="scan_output.json",
+        const="windows_scan.json",
         default=None,
         help="Save the payload to a JSON file instead of sending to the backend. "
-             "Optionally specify a filename (default: scan_output.json).",
+             "Optionally specify a filename (default: windows_scan.json).",
     )
     return parser.parse_args()
 
