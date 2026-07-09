@@ -1,58 +1,52 @@
 {
   "hostname": "DESKTOP-I8OVKMA",
   "os": "windows",
-  "os_version": "Windows 11 Professional",
-  "kernel": "10.0.26200",
+  "os_version": "Windows 10 (Build #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025)",
+  "kernel": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025",
   "agent_version": "0.1.0",
-  "scanned_at": "2026-07-07T15:33:24.054969Z",
-  "uptime_seconds": 29778,
-  "ip_address": "192.168.100.9",
+  "scanned_at": "2026-07-09T07:25:55.296322Z",
+  "uptime_seconds": 14154,
+  "ip_address": "172.30.158.69",
   "findings": [
     {
-      "category": "local_llm",
-      "name": "ollama",
-      "severity": "low",
-      "status": "not_detected",
-      "evidence": "Ollama process not found, port 11434 not listening",
-      "detected_at": "2026-07-07T15:33:24.054969Z"
-    },
-    {
-      "category": "ai_ide",
-      "name": "cursor",
-      "severity": "medium",
+      "category": "mcp_server",
+      "name": "mcp_config",
+      "severity": "high",
       "status": "detected",
-      "evidence": "Cursor installation found: C:\\Users\\ASUS Vivobook\\AppData\\Roaming\\Cursor",
-      "path": "C:\\Users\\ASUS Vivobook\\AppData\\Roaming\\Cursor",
-      "user": "ASUS Vivobook",
-      "detected_at": "2026-07-07T15:33:24.054969Z"
-    },
-    {
-      "category": "ai_ide",
-      "name": "github_copilot",
-      "severity": "low",
-      "status": "not_detected",
-      "evidence": "VS Code Copilot extension not found",
-      "detected_at": "2026-07-07T15:33:24.054969Z"
+      "evidence": "MCP config found: /home/kohtun/.mcp.json (3 server(s) configured)",
+      "path": "/home/kohtun/.mcp.json",
+      "user": "kohtun",
+      "detected_at": "2026-07-09T07:25:55.296322Z"
     },
     {
       "category": "mcp_server",
       "name": "mcp_config",
       "severity": "high",
       "status": "detected",
-      "evidence": "MCP config found: C:\\Users\\ASUS Vivobook\\AppData\\Roaming\\Claude\\claude_desktop_config.json (2 server(s) configured)",
-      "path": "C:\\Users\\ASUS Vivobook\\AppData\\Roaming\\Claude\\claude_desktop_config.json",
-      "user": "ASUS Vivobook",
-      "detected_at": "2026-07-07T15:33:24.054969Z"
+      "evidence": "MCP config found: /home/kohtun/.cursor/mcp.json (2 server(s) configured)",
+      "path": "/home/kohtun/.cursor/mcp.json",
+      "user": "kohtun",
+      "detected_at": "2026-07-09T07:25:55.296322Z"
     },
     {
       "category": "mcp_server",
-      "name": "mcp_config",
+      "name": "mcp_server_process",
       "severity": "high",
       "status": "detected",
-      "evidence": "MCP config found: C:\\Users\\ASUS Vivobook\\.cursor\\mcp.json (1 server(s) configured)",
-      "path": "C:\\Users\\ASUS Vivobook\\.cursor\\mcp.json",
-      "user": "ASUS Vivobook",
-      "detected_at": "2026-07-07T15:33:24.054969Z"
+      "evidence": "MCP server process: node (PID 293894)",
+      "pid": 293894,
+      "user": "kohtun",
+      "detected_at": "2026-07-09T07:25:55.296322Z"
+    },
+    {
+      "category": "mcp_server",
+      "name": "mcp_server_process",
+      "severity": "high",
+      "status": "detected",
+      "evidence": "MCP server process: node (PID 293998)",
+      "pid": 293998,
+      "user": "kohtun",
+      "detected_at": "2026-07-09T07:25:55.296322Z"
     }
   ]
 }

@@ -93,7 +93,11 @@ def get_local_ip() -> str:
 
 
 def get_username() -> str:
-    return os.getlogin()
+    try:
+        return os.getlogin()
+    except OSError:
+        import getpass
+        return getpass.getuser()
 
 
 # ── Scan: Local LLM (Ollama) ─────────────────────────────────────────
@@ -136,14 +140,6 @@ def scan_ollama(findings: list, now: str) -> None:
             })
             return
 
-    findings.append({
-        "category": "local_llm",
-        "name": "ollama",
-        "severity": "low",
-        "status": "not_detected",
-        "evidence": "Ollama process not found, port 11434 not listening",
-        "detected_at": now,
-    })
 
 
 # ── Scan: AI IDEs ─────────────────────────────────────────────────────
@@ -195,14 +191,6 @@ def scan_cursor(findings: list, now: str) -> None:
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
-    findings.append({
-        "category": "ai_ide",
-        "name": "cursor",
-        "severity": "low",
-        "status": "not_detected",
-        "evidence": "Cursor not found in standard paths or running processes",
-        "detected_at": now,
-    })
 
 
 def scan_vscode_copilot(findings: list, now: str) -> None:
@@ -228,14 +216,6 @@ def scan_vscode_copilot(findings: list, now: str) -> None:
             })
             return
 
-    findings.append({
-        "category": "ai_ide",
-        "name": "github_copilot",
-        "severity": "low",
-        "status": "not_detected",
-        "evidence": "VS Code Copilot extension not found",
-        "detected_at": now,
-    })
 
 
 # ── Scan: MCP Servers ─────────────────────────────────────────────────
@@ -258,11 +238,9 @@ MCP_CONFIG_LOCATIONS = [
 def scan_mcp_configs(findings: list, now: str) -> None:
     """Check for MCP server configuration files."""
     user = get_username()
-    found_any = False
 
     for config_path in MCP_CONFIG_LOCATIONS:
         if config_path.exists():
-            found_any = True
             # Try to read and count configured servers
             server_count = 0
             try:
@@ -293,15 +271,6 @@ def scan_mcp_configs(findings: list, now: str) -> None:
                 "detected_at": now,
             })
 
-    if not found_any:
-        findings.append({
-            "category": "mcp_server",
-            "name": "mcp_config",
-            "severity": "low",
-            "status": "not_detected",
-            "evidence": "No MCP config files found in standard locations",
-            "detected_at": now,
-        })
 
 
 def scan_mcp_processes(findings: list, now: str) -> None:
@@ -452,8 +421,7 @@ def main() -> None:
 
     for f in payload["findings"]:
         icon = {"high": "!!!", "medium": "!", "low": "-"}.get(f["severity"], "?")
-        status = "FOUND" if f["status"] == "detected" else "clean"
-        print(f"  [{icon}] {f['category']}/{f['name']}: {status} — {f['evidence']}")
+        print(f"  [{icon}] {f['category']}/{f['name']}: {f['evidence']}")
 
     # ── JSON dump mode ────────────────────────────────────────────
     if args.json:
