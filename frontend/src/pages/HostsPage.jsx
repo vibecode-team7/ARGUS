@@ -23,8 +23,14 @@ const COLUMNS = [
   { key: "medium", label: "Medium" },
   { key: "low", label: "Low" },
   { key: "total_findings", label: "Total" },
+  { key: "risk", label: "Risk" },
   { key: "status", label: "Status" },
 ];
+
+// Weighted so a single High always outranks any number of Medium/Low findings.
+function riskScore(host) {
+  return host.high * 100 + host.medium * 10 + host.low;
+}
 
 export default function HostsPage() {
   const { data: hosts, loading, error, refetch } = useHosts();
@@ -53,6 +59,10 @@ export default function HostsPage() {
         const order = { green: 0, yellow: 1, red: 2 };
         av = order[getAgentStatus(av)] ?? 3;
         bv = order[getAgentStatus(bv)] ?? 3;
+      }
+      if (sortKey === "risk") {
+        av = riskScore(a);
+        bv = riskScore(b);
       }
       if (typeof av === "string") av = av.toLowerCase();
       if (typeof bv === "string") bv = bv.toLowerCase();
@@ -127,6 +137,7 @@ export default function HostsPage() {
                     <td className={`px-4 py-3 font-semibold ${getSeverityColor("medium")}`}>{host.medium}</td>
                     <td className={`px-4 py-3 font-semibold ${getSeverityColor("low")}`}>{host.low}</td>
                     <td className="px-4 py-3 font-medium text-text-primary">{host.total_findings}</td>
+                    <td className="px-4 py-3 font-semibold text-text-primary">{riskScore(host)}</td>
                     <td className="px-4 py-3">
                       <StatusDot status={status} label={status === "green" ? "Online" : status === "yellow" ? "Idle" : "Stale"} />
                     </td>

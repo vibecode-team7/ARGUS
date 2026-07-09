@@ -158,8 +158,8 @@ export default function FindingsPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-border">
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm" aria-label="Findings list">
           <thead>
             <tr className="border-b border-border bg-bg-secondary">
@@ -243,6 +243,58 @@ export default function FindingsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile card layout */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="p-4 rounded-xl bg-bg-card border border-border">
+              <div className="skeleton h-5 w-40 mb-2" />
+              <div className="skeleton h-4 w-24" />
+            </div>
+          ))
+        ) : sorted.length === 0 ? (
+          <EmptyState
+            icon={XCircle}
+            title="No findings match your filters"
+            description="Try adjusting your filters or clearing them."
+          />
+        ) : (
+          sorted.map((f) => (
+            <div
+              key={`${f.scan.id}-${f.id}`}
+              onClick={() => window.location.href = `/findings/${f.scan.id}`}
+              className="p-4 rounded-xl bg-bg-card border border-border cursor-pointer hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-medium text-text-primary truncate">{f.name}</span>
+                  <CategoryBadge category={f.category} />
+                </div>
+                <SeverityBadge severity={f.severity} />
+              </div>
+              <p className="text-xs text-text-muted mb-2">
+                {f.scan.hostname} · Scan #{f.scan.id}
+              </p>
+              <p className="text-xs text-text-secondary mb-2 truncate" title={f.evidence}>
+                {f.evidence}
+              </p>
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                {f.status === "detected" ? (
+                  <span className="inline-flex items-center gap-1 text-success font-medium">
+                    <CheckCircle size={12} /> Detected
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-text-muted font-medium">
+                    <XCircle size={12} /> Not detected
+                  </span>
+                )}
+                <span>{formatTimestamp(f.detected_at)}</span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Pagination */}
