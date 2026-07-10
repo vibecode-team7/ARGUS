@@ -98,7 +98,8 @@ def detect_ollama() -> list[dict]:
 def detect_cursor() -> list[dict]:
     """Scan for Cursor IDE installation via directory check.
 
-    Only returns a finding when Cursor is actively detected.
+    Checks common Cursor configuration/install directories on Linux.
+    Only returns a finding when a Cursor directory is found.
     Prints a subtle console log when clean.
     """
     findings = []
@@ -116,32 +117,15 @@ def detect_cursor() -> list[dict]:
         if os.path.exists(path):
             cursor_paths.append(path)
 
-    # Also check for running Cursor processes
-    cursor_pids = []
-    for proc in psutil.process_iter(["pid", "name"]):
-        try:
-            name = (proc.info["name"] or "").lower()
-            if "cursor" in name:
-                cursor_pids.append(proc.info["pid"])
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            continue
-
-    if cursor_paths or cursor_pids:
-        evidence_parts = []
-        if cursor_paths:
-            evidence_parts.append(f"Config found: {cursor_paths[0]}")
-        if cursor_pids:
-            evidence_parts.append(f"Running (PIDs: {', '.join(str(p) for p in cursor_pids)})")
-
+    if cursor_paths:
         findings.append({
             "category": "ai_ide",
             "name": "cursor",
             "severity": "medium",
             "status": "detected",
-            "evidence": "; ".join(evidence_parts),
-            "path": cursor_paths[0] if cursor_paths else None,
-            "pid": cursor_pids[0] if len(cursor_pids) == 1 else None,
-            "user": _get_proc_user(cursor_pids[0]) if cursor_pids else _get_current_user(),
+            "evidence": f"Config found: {cursor_paths[0]}",
+            "path": cursor_paths[0],
+            "user": _get_current_user(),
             "detected_at": now,
         })
     else:
