@@ -16,7 +16,6 @@ Requires:
 import os
 import platform
 import socket
-import subprocess
 import glob
 from datetime import datetime, timezone
 
@@ -40,7 +39,11 @@ MCP_CONFIG_PATTERNS = [
 # ── Detection: Ollama (Cat 1 — local_llm) ─────────────────────────────
 
 def detect_ollama() -> list[dict]:
-    """Check for Ollama running processes and open ports."""
+    """Check for Ollama running processes and open ports.
+
+    Only returns a finding when Ollama is actively detected.
+    Prints a subtle console log when clean.
+    """
     findings = []
     ollama_pids = []
     now = datetime.now(timezone.utc).isoformat()
@@ -85,14 +88,7 @@ def detect_ollama() -> list[dict]:
             "detected_at": now,
         })
     else:
-        findings.append({
-            "category": "local_llm",
-            "name": "ollama",
-            "severity": "high",
-            "status": "not_detected",
-            "evidence": "Ollama not running, port 11434 not in use",
-            "detected_at": now,
-        })
+        print("🟢 ollama: not running")
 
     return findings
 
@@ -100,7 +96,11 @@ def detect_ollama() -> list[dict]:
 # ── Detection: Cursor (Cat 2 — ai_ide) ────────────────────────────────
 
 def detect_cursor() -> list[dict]:
-    """Scan for Cursor IDE installation via directory check."""
+    """Scan for Cursor IDE installation via directory check.
+
+    Only returns a finding when Cursor is actively detected.
+    Prints a subtle console log when clean.
+    """
     findings = []
     cursor_paths = []
     now = datetime.now(timezone.utc).isoformat()
@@ -145,14 +145,7 @@ def detect_cursor() -> list[dict]:
             "detected_at": now,
         })
     else:
-        findings.append({
-            "category": "ai_ide",
-            "name": "cursor",
-            "severity": "medium",
-            "status": "not_detected",
-            "evidence": "Cursor not found in standard locations",
-            "detected_at": now,
-        })
+        print("🟢 cursor: not found")
 
     return findings
 
@@ -160,7 +153,11 @@ def detect_cursor() -> list[dict]:
 # ── Detection: MCP Configs (Cat 5 — mcp_server) ──────────────────────
 
 def detect_mcp_configs() -> list[dict]:
-    """Scan for MCP server configuration files."""
+    """Scan for MCP server configuration files.
+
+    Only returns a finding when an MCP config is actively detected.
+    Prints a subtle console log when clean.
+    """
     findings = []
     found_configs = []
     now = datetime.now(timezone.utc).isoformat()
@@ -197,14 +194,7 @@ def detect_mcp_configs() -> list[dict]:
             "detected_at": now,
         })
     else:
-        findings.append({
-            "category": "mcp_server",
-            "name": "mcp_config",
-            "severity": "high",
-            "status": "not_detected",
-            "evidence": "No MCP config files found",
-            "detected_at": now,
-        })
+        print("🟢 mcp_config: no configs found")
 
     return findings
 
@@ -310,12 +300,13 @@ def main():
     payload = build_payload()
 
     # Summary
-    detected = [f for f in payload["findings"] if f["status"] == "detected"]
     print(f"Host: {payload['hostname']} ({payload['os_version']})")
-    print(f"Findings: {len(detected)} detected, {len(payload['findings']) - len(detected)} clean")
-    for f in payload["findings"]:
-        icon = "🔴" if f["status"] == "detected" else "🟢"
-        print(f"  {icon} [{f['category']}] {f['name']}: {f['evidence']}")
+    if payload["findings"]:
+        print(f"Findings: {len(payload['findings'])} detected")
+        for f in payload["findings"]:
+            print(f"  🔴 [{f['category']}] {f['name']}: {f['evidence']}")
+    else:
+        print("No findings detected.")
     print()
 
     # Send
