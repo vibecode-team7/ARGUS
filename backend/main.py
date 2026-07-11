@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Depends, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -113,7 +114,7 @@ def list_findings(
         if hostname:
             q = q.where(Scan.hostname == hostname)
         if severity:
-            q = q.join(Scan.findings).where(Finding.severity == severity)
+            q = q.join(Scan.findings).where(Finding.severity == severity).distinct()
 
         total = session.execute(select(func.count()).select_from(q.subquery())).scalar()
         scans = session.execute(q.offset(offset).limit(limit)).scalars().all()
@@ -273,3 +274,51 @@ def stats(_: int = Depends(verify_read_key)):
         "medium_risk": medium,
         "low_risk": low,
     }
+
+
+@app.get("/api/trends")
+def trends(
+    _: int = Depends(verify_read_key),
+    days: int = Query(30, ge=1, le=365),
+):
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since_naive = since.replace(tzinfo=None)
+
+    with get_session() as session:
+        findings_rows = session.execute(
+            select(Finding.detected_at, Finding.severity)
+            .where(Finding.detected_at >= since_naive)
+        ).all()
+
+        first_seen_rows = session.execute(
+            select(Scan.hostname, func.min(Scan.received_at))
+            .group_by(Scan.hostname)
+        ).all()
+
+    findings_by_day = defaultdict(lambda: {"high": 0, "medium": 0, "low": 0})
+    for detected_at, severity in findings_rows:
+        day = detected_at.date().isoformat()
+        if severity in findings_by_day[day]:
+            findings_by_day[day][severity] += 1
+
+    new_hosts_by_day = defaultdict(int)
+    for _hostname, first_received in first_seen_rows:
+        if first_received >= since_naive:
+            day = first_received.date().isoformat()
+            new_hosts_by_day[day] += 1
+
+    days_range = [
+        (since_naive.date() + timedelta(days=i)).isoformat()
+        for i in range(days + 1)
+    ]
+
+    findings_series = [
+        {"date": day, **findings_by_day.get(day, {"high": 0, "medium": 0, "low": 0})}
+        for day in days_range
+    ]
+    hosts_series = [
+        {"date": day, "new_hosts": new_hosts_by_day.get(day, 0)}
+        for day in days_range
+    ]
+
+    return {"days": days, "findings": findings_series, "new_hosts": hosts_series}
