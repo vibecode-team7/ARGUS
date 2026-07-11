@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-## Project Overview
+## Project Overview  
 
 **ARGUS** (AI Risk & Governance Unauthorized-endpoint Scanner) — a decentralized security framework that detects **Shadow AI** (unauthorized AI tools) across enterprise endpoints. Lightweight agents scan machines and report findings to a central FastAPI backend.
 
