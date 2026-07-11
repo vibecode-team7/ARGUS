@@ -107,9 +107,12 @@ def _port_is_open(host: str, port: int) -> bool:
         return s.connect_ex((host, port)) == 0
 
 
-def detect_ollama() -> dict:
+def detect_ollama() -> dict | None:
     """Cat 1: local LLM runtime. Looks for a listening socket on 11434,
-    falling back to a process-name scan, then a raw port probe."""
+    falling back to a process-name scan, then a raw port probe.
+    Returns None when nothing is found - only actual detections are
+    reported, so severity filters on the backend don't pick up hosts
+    where nothing was found."""
     detected_at = now_iso()
 
     pid = _find_ollama_listener_pid()
@@ -157,18 +160,13 @@ def detect_ollama() -> dict:
             "detected_at": detected_at,
         }
 
-    return {
-        "category": "local_llm",
-        "name": "ollama",
-        "severity": "high",
-        "status": "not_detected",
-        "evidence": f"No process or listener found on port {OLLAMA_PORT}",
-        "detected_at": detected_at,
-    }
+    print("🟢 ollama: not running")
+    return None
 
 
-def detect_cursor() -> dict:
-    """Cat 2: AI IDE. Looks for the ~/.cursor config directory."""
+def detect_cursor() -> dict | None:
+    """Cat 2: AI IDE. Looks for the ~/.cursor config directory.
+    Returns None when nothing is found."""
     detected_at = now_iso()
     cursor_dir = Path.home() / ".cursor"
 
@@ -184,18 +182,13 @@ def detect_cursor() -> dict:
             "detected_at": detected_at,
         }
 
-    return {
-        "category": "ai_ide",
-        "name": "cursor",
-        "severity": "medium",
-        "status": "not_detected",
-        "evidence": f"No Cursor config found at {cursor_dir}",
-        "detected_at": detected_at,
-    }
+    print("🟢 cursor: not found")
+    return None
 
 
-def detect_mcp() -> dict:
-    """Cat 5: MCP servers. Scans known MCP config file locations."""
+def detect_mcp() -> dict | None:
+    """Cat 5: MCP servers. Scans known MCP config file locations.
+    Returns None when nothing is found."""
     detected_at = now_iso()
 
     for config_path in MCP_CONFIG_PATHS:
@@ -211,18 +204,12 @@ def detect_mcp() -> dict:
                 "detected_at": detected_at,
             }
 
-    return {
-        "category": "mcp_server",
-        "name": "mcp_config",
-        "severity": "high",
-        "status": "not_detected",
-        "evidence": "No MCP config files found",
-        "detected_at": detected_at,
-    }
+    print("🟢 mcp_config: no configs found")
+    return None
 
 
 def build_payload() -> dict:
-    findings = [detect_ollama(), detect_cursor(), detect_mcp()]
+    findings = [f for f in (detect_ollama(), detect_cursor(), detect_mcp()) if f is not None]
 
     return {
         "hostname": get_hostname(),
