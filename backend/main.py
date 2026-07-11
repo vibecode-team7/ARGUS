@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from database import init_db, get_session, Scan, Finding
 from auth import verify_write_key, verify_read_key
+from alerting import send_high_risk_alert
 
 app = FastAPI(title="ARGUS Backend", version="0.1.0")
 
@@ -95,6 +96,13 @@ def ingest_scan(payload: ScanIn, api_key_id: int = Depends(verify_write_key)):
 
         session.commit()
         session.refresh(scan)
+
+    detected_findings = [
+        {"name": f.name, "category": f.category, "severity": f.severity, "evidence": f.evidence}
+        for f in payload.findings
+        if f.status == "detected"
+    ]
+    send_high_risk_alert(payload.hostname, detected_findings)
 
     return {"id": scan.id, "hostname": scan.hostname, "findings_count": len(payload.findings)}
 
