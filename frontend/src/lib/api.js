@@ -53,7 +53,44 @@
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
-const API_KEY = import.meta.env.VITE_ARGUS_API_KEY ?? "";
+const SESSION_KEY = "argus-api-key";
+
+/**
+ * The dashboard read-key, resolved at call time so login/logout take
+ * effect without a page reload. Falls back to the build-time env var
+ * (handy for local dev) when no key has been entered via the login page.
+ */
+function getApiKey() {
+  try {
+    return sessionStorage.getItem(SESSION_KEY) ?? import.meta.env.VITE_ARGUS_API_KEY ?? "";
+  } catch {
+    return import.meta.env.VITE_ARGUS_API_KEY ?? "";
+  }
+}
+
+export function getStoredApiKey() {
+  try {
+    return sessionStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredApiKey(key) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, key);
+  } catch {
+    /* sessionStorage unavailable */
+  }
+}
+
+export function clearStoredApiKey() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* sessionStorage unavailable */
+  }
+}
 
 /**
  * Core fetch wrapper. Attaches API key, parses JSON, throws on error.
@@ -61,8 +98,9 @@ const API_KEY = import.meta.env.VITE_ARGUS_API_KEY ?? "";
 async function request(path, { signal } = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
-      "X-API-Key": API_KEY,
+      "X-API-Key": getApiKey(),
     },
+    cache: "no-store",
     signal,
   });
 
@@ -86,6 +124,20 @@ async function request(path, { signal } = {}) {
  */
 export function healthCheck() {
   return fetch(`${BASE_URL}/health`).then((r) => r.json());
+}
+
+/**
+ * Validate an API key against the backend before storing it.
+ * Used by the login page — does not rely on getApiKey().
+ * @param {string} key
+ * @returns {Promise<boolean>}
+ */
+export async function verifyApiKey(key) {
+  const res = await fetch(`${BASE_URL}/api/stats`, {
+    headers: { "X-API-Key": key },
+    cache: "no-store",
+  });
+  return res.ok;
 }
 
 /**

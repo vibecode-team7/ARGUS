@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate, useLocation } from "react-router";
 import Layout from "./components/layout/Layout";
+import { useAuth } from "./context/AuthContext";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const HostsPage = lazy(() => import("./pages/HostsPage"));
@@ -9,6 +10,7 @@ const FindingsPage = lazy(() => import("./pages/FindingsPage"));
 const ScanDetailPage = lazy(() => import("./pages/ScanDetailPage"));
 const TrendsPage = lazy(() => import("./pages/TrendsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
 
 function Loading() {
   return (
@@ -18,10 +20,35 @@ function Loading() {
   );
 }
 
+function RequireAuth({ children }) {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  return children;
+}
+
 const App = () => {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route
+        path="login"
+        element={
+          <Suspense fallback={<Loading />}>
+            <LoginPage />
+          </Suspense>
+        }
+      />
+      <Route
+        element={
+          <RequireAuth>
+            <Layout />
+          </RequireAuth>
+        }
+      >
         <Route
           index
           element={
