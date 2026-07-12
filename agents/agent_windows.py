@@ -347,7 +347,7 @@ def scan_extra_ai_tools(findings: list, now: str) -> None:
 
 def build_payload() -> dict:
     """Run all scans and build the API payload."""
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     findings: list = []
 
     scan_ollama(findings, now)
