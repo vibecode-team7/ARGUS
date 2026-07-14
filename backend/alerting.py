@@ -1,6 +1,9 @@
+import logging
 import os
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
@@ -24,9 +27,8 @@ def _send_slack(message: str) -> None:
 def send_high_risk_alert(hostname: str, findings: list[dict]) -> None:
     """Fire Discord/Slack webhook alerts for high-severity findings.
 
-    Best-effort: webhook failures are swallowed so a flaky Discord/Slack
-    endpoint can never fail scan ingestion. No-ops if neither webhook
-    env var is set.
+    Best-effort: webhook failures are logged but never break scan ingestion.
+    No-ops if neither webhook env var is set.
     """
     high_findings = [f for f in findings if f["severity"] == "high"]
     if not high_findings:
@@ -37,11 +39,11 @@ def send_high_risk_alert(hostname: str, findings: list[dict]) -> None:
     if DISCORD_WEBHOOK_URL:
         try:
             _send_discord(message)
-        except httpx.HTTPError:
-            pass
+        except httpx.HTTPError as e:
+            logger.warning("Discord webhook failed: %s", e)
 
     if SLACK_WEBHOOK_URL:
         try:
             _send_slack(message)
-        except httpx.HTTPError:
-            pass
+        except httpx.HTTPError as e:
+            logger.warning("Slack webhook failed: %s", e)
