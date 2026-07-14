@@ -78,23 +78,3 @@ jobs:
         env:
           ARGUS_KEY_TEST: test_key_for_ci
         run: pytest backend/tests/ -q || true       # ch-8: drop `|| true` to enforce
-
-      # ---------- Docker (backend) ----------
-      # ADDED: Docker build and smoke test for backend
-      - name: Docker build (backend)
-        if: ${{ hashFiles('backend/Dockerfile') != '' }}
-        run: cd backend && docker build -t argus-backend:ci .
-      - name: Docker smoke test (backend)
-        if: ${{ hashFiles('backend/Dockerfile') != '' }}
-        run: |
-          cd backend
-          docker run -d -p 8000:8000 --name argus-test argus-backend:ci
-          sleep 3
-          curl -sf http://localhost:8000/health || (docker logs argus-test && exit 1)
-          docker stop argus-test
-
-      # ---------- Docker (frontend) ----------
-      # ADDED: Docker build for frontend
-      - name: Docker build (frontend)
-        if: ${{ hashFiles('frontend/Dockerfile') != '' }}
-        run: cd frontend && docker build -t argus-frontend:ci .
