@@ -1,0 +1,13 @@
+services:
+  backend:
+    image: kpzik/argus-backend:latest
+    container_name: argus-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - argus-data:/app/data
+      - ~/argus-config/.env:/app/.env:ro
+    restart: unless-stopped
+
+volumes:
+  argus-data:
