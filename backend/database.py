@@ -88,7 +88,7 @@ MIGRATIONS = [
 
 
 def _get_columns(conn, table_name: str) -> set[str]:
-    # nosemgrep: avoid-sqlalchemy-text — inputs are hardcoded in MIGRATIONS dict, not user-controlled
+    # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
     result = conn.execute(text(f"PRAGMA table_info({table_name})"))
     return {row[1] for row in result}
 
@@ -115,8 +115,8 @@ def _migrate():
 
             col_type = migration["type"]
             print(f"  MIGRATE  Adding column {table}.{column} ({col_type})")
-            # nosemgrep: avoid-sqlalchemy-text — inputs are hardcoded in MIGRATIONS dict, not user-controlled
             conn.execute(
+                # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
             )
             conn.commit()

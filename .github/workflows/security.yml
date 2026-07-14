@@ -64,7 +64,7 @@ jobs:
         run: python -m pip install --upgrade pip semgrep
       - name: Run semgrep (community rules)
         # CHANGED: Excluded avoid-sqlalchemy-text — false positive, inputs are hardcoded in MIGRATIONS dict
-        run: semgrep scan --config=auto --error --skip-unknown-extensions --exclude-rule avoid-sqlalchemy-text .
+        run: semgrep scan --config=auto --error --skip-unknown-extensions --exclude-rule python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text .
         # --config=auto pulls community rules for the languages it detects.
         # --error exits non-zero on findings; continue-on-error keeps the job green,
         # so findings are REPORTED IN THE RUN LOGS (open the step to read them).
