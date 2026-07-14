@@ -1,6 +1,7 @@
-import { NavLink } from "react-router";
-import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp } from "lucide-react";
+import { NavLink, useNavigate } from "react-router";
+import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp, LogOut } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
+import { useAuth } from "../../context/AuthContext";
 
 const NAV_ITEMS = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -10,6 +11,15 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({ open, onClose }) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    onClose?.();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <>
       {/* Mobile overlay */}
@@ -66,12 +76,21 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </nav>
 
-        {/* Theme toggle at bottom */}
-        <div className="px-3 py-4 border-t border-border">
-          <div className="flex items-center justify-between px-2">
+        {/* Theme toggle + logout at bottom */}
+        <div className="px-3 py-4 border-t border-border space-y-1">
+          <div className="flex items-center justify-between px-2 pb-3">
             <span className="text-xs text-text-muted">Theme</span>
             <ThemeToggle />
           </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium
+              text-text-secondary hover:text-text-primary hover:bg-bg-secondary
+              transition-colors cursor-pointer"
+          >
+            <LogOut size={18} />
+            Log out
+          </button>
         </div>
       </aside>
     </>
