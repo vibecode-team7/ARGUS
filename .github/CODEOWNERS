@@ -6,10 +6,16 @@
 # More specific lines win. Every PR still needs 1 approval from a non-author.
 
 # Default owner for everything (fallback) — set to the week's Anchor:
-# *                     @team-anchor
+*                     @KiZINnO
 
 # Split ownership across members so reviews rotate naturally:
-# /src/frontend/        @member-a @member-b
-# /src/backend/         @member-c @member-d
-# *.md                  @member-e
-# /.github/             @team-anchor
+# ADDED: Backend ownership
+/backend/             @KiZINnO
+# ADDED: Frontend ownership
+/frontend/            @Thuyein-Thet, @oliverhenry-dev
+# ADDED: Agent scripts ownership
+/agents/              @Wint-Theingi-Aung, @kohtun386, @Thuyein-Thet
+# ADDED: Documentation ownership
+*.md                  @KiZINnO
+# ADDED: CI/CD ownership
+/.github/             @KiZINnO

@@ -32,7 +32,8 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true          # ch-8: remove to enforce
     steps:
-      - uses: actions/checkout@v7
+      # CHANGED: Pinned actions/checkout to full SHA for supply-chain security
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           fetch-depth: 0             # full history so gitleaks scans past commits too
       - name: gitleaks (secrets scan)
@@ -52,8 +53,10 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true          # ch-8: remove to enforce
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      # CHANGED: Pinned actions/checkout to full SHA
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      # CHANGED: Pinned actions/setup-python to full SHA
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.12"
           cache: "pip"
@@ -65,3 +68,38 @@ jobs:
         # --error exits non-zero on findings; continue-on-error keeps the job green,
         # so findings are REPORTED IN THE RUN LOGS (open the step to read them).
         # Expect some false positives — triaging them is the lesson.
+
+  # ADDED: JavaScript/React security scanning for frontend
+  sast-frontend:
+    name: sast-frontend (semgrep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install semgrep
+        run: python -m pip install --upgrade pip semgrep
+      - name: Run semgrep (JavaScript/React rules)
+        run: semgrep scan --config="p/javascript p/react" --error --skip-unknown-extensions frontend/
+
+  # ADDED: Docker image vulnerability scanning
+  trivy-docker:
+    name: trivy-docker (container scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      # ADDED: Build Docker image for scanning
+      - name: Build Docker image (backend)
+        run: cd backend && docker build -t argus-backend:scan .
+      - name: Run Trivy on Docker image
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e6f11a5c72e16a10
+        with:
+          image-ref: "argus-backend:scan"
+          format: "table"
+          severity: "CRITICAL,HIGH"
