@@ -223,11 +223,20 @@ docker buildx build \
 
 ### Step 3: Deploy Backend on VPS
 
+**Port binding depends on your setup:**
+
+| Setup | Port Flag | Why |
+|---|---|---|
+| Without NPM (direct access) | `-p 8000:8000` | Agents need to reach backend directly |
+| With NPM (proxied) | `-p 127.0.0.1:8000:8000` | NPM proxies internally, no direct access needed |
+
+**Without NPM (current setup — agents access backend directly):**
+
 ```bash
 # SSH into VPS
 ssh root@<vps-ip>
 
-# Pull and run
+# Pull and run — exposed to internet (needed for agents without NPM)
 docker pull kpzik/argus-backend:latest
 docker run -d \
   --name argus-backend \
@@ -241,23 +250,55 @@ docker run -d \
 docker exec argus-backend python seed.py
 ```
 
+**With NPM (after HTTPS setup — agents access via https://argus.duckdns.org):**
+
+```bash
+# Bind to localhost only — NPM proxies to it internally
+docker run -d \
+  --name argus-backend \
+  -p 127.0.0.1:8000:8000 \
+  -v argus-data:/app/data \
+  -v ~/argus-config/.env:/app/.env:ro \
+  --restart unless-stopped \
+  kpzik/argus-backend:latest
+```
+
 | Flag | Purpose |
 |------|---------|
 | `-d` | Run in background |
 | `--name argus-backend` | Container name for docker commands |
-| `-p 127.0.0.1:8000:8000` | Bind to localhost only (not exposed to internet) |
+| `-p 8000:8000` | Expose to internet (agents need direct access without NPM) |
+| `-p 127.0.0.1:8000:8000` | Localhost only (NPM handles external access) |
 | `-v argus-data:/app/data` | Persist SQLite database |
 | `-v ~/argus-config/.env:/app/.env:ro` | Mount .env read-only |
 | `--restart unless-stopped` | Auto-restart on reboot |
 
 ### Step 4: Deploy Frontend on VPS
 
+**Port binding depends on your setup:**
+
+| Setup | Port Flag | Why |
+|---|---|---|
+| Without NPM | `-p 80:80` | Browser needs to access frontend directly |
+| With NPM | `-p 127.0.0.1:80:80` | NPM proxies internally |
+
+**Without NPM:**
+
 ```bash
-# Pull and run
 docker pull kpzik/argus-frontend:latest
 docker run -d \
   --name argus-frontend \
   -p 80:80 \
+  --restart unless-stopped \
+  kpzik/argus-frontend:latest
+```
+
+**With NPM:**
+
+```bash
+docker run -d \
+  --name argus-frontend \
+  -p 127.0.0.1:80:80 \
   --restart unless-stopped \
   kpzik/argus-frontend:latest
 ```
@@ -496,14 +537,22 @@ If you see `No 'Access-Control-Allow-Origin' header` in browser console:
 
 ## Security Checklist
 
+**Without NPM (direct access):**
+- [ ] Backend port 8000 exposed (agents need direct access)
+- [ ] Frontend port 80 exposed (browser needs direct access)
+- [ ] Use HTTPS when possible (agents send API keys in headers)
+
+**With NPM (recommended):**
 - [ ] Backend port 8000 bound to `127.0.0.1` only
 - [ ] Frontend port 80 bound to `127.0.0.1` only
 - [ ] NPM handles all SSL termination
 - [ ] HTTP redirects to HTTPS
-- [ ] API keys in .env (not hardcoded)
-- [ ] .env mounted read-only in container
 - [ ] Agents use `https://` URL
 - [ ] Frontend built with `VITE_API_URL=https://argus.duckdns.org`
+
+**Both setups:**
+- [ ] API keys in .env (not hardcoded)
+- [ ] .env mounted read-only in container
 - [ ] Docker containers run as non-root user (semgrep: missing-user)
 
 ---
