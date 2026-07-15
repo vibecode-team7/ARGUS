@@ -139,6 +139,10 @@ def list_findings(
 
         results = []
         for scan in scans:
+            scan_findings = scan.findings
+            if severity:
+                scan_findings = [f for f in scan_findings if f.severity == severity]
+
             results.append({
                 "id": scan.id,
                 "hostname": scan.hostname,
@@ -164,7 +168,7 @@ def list_findings(
                         "user": f.user,
                         "detected_at": f.detected_at.isoformat(),
                     }
-                    for f in scan.findings
+                    for f in scan_findings
                 ],
             })
 

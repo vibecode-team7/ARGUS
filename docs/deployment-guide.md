@@ -23,7 +23,7 @@ Agent/Browser → https://argus.duckdns.org (NPM:443)
 
 ---
 
-## Local Development
+## Local Development (No Docker)
 
 ### Backend
 
@@ -66,6 +66,82 @@ curl -H "X-API-Key: <your-read-key>" http://localhost:8000/api/findings
 
 ---
 
+## Local Testing (Docker)
+
+### Build and Run Backend
+
+```bash
+cd backend
+
+# Build image
+docker build -t argus-backend:latest .
+
+# Run container
+docker run -d -p 8000:8000 \
+  -v argus-data:/app/data \
+  -v $(pwd)/.env:/app/.env:ro \
+  --name argus-backend \
+  argus-backend:latest
+
+# Seed API keys (first time only)
+docker exec argus-backend python seed.py
+```
+
+### Build and Run Frontend (with backend)
+
+```bash
+cd frontend
+
+# Build image (points to local backend)
+docker build \
+  --build-arg VITE_API_URL=http://localhost:8000 \
+  -t argus-frontend:latest .
+
+# Run container
+docker run -d -p 80:80 --name argus-frontend argus-frontend:latest
+```
+
+### CORS Configuration
+
+The frontend runs on port 80, which is a different origin from port 8000. Add both origins to `backend/.env`:
+
+```
+CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
+```
+
+Restart the backend after changing `.env`:
+
+```bash
+docker restart argus-backend
+```
+
+### Verify
+
+```bash
+# Backend health
+curl http://localhost:8000/health
+
+# Frontend — open http://localhost in browser
+# Login with dashboard read key from .env
+
+# Logs
+docker logs argus-backend
+docker logs argus-frontend
+```
+
+### Stop and Clean Up
+
+```bash
+# Stop containers
+docker stop argus-backend argus-frontend
+docker rm argus-backend argus-frontend
+
+# Remove volumes (deletes database)
+docker volume rm argus-data
+```
+
+---
+
 ## Production Deployment (VPS)
 
 ### Prerequisites
@@ -73,49 +149,95 @@ curl -H "X-API-Key: <your-read-key>" http://localhost:8000/api/findings
 - VPS with Docker installed
 - Nginx Proxy Manager (NPM) running on port 81
 - DuckDNS domain pointing to VPS IP
+- Docker Hub account (`kpzik`)
 
 ### Step 1: Prepare .env on VPS
 
 ```bash
+# SSH into VPS
+ssh root@<vps-ip>
+
+# Create config directory
 mkdir -p ~/argus-config
+
+# Create .env with production keys
 cat > ~/argus-config/.env << 'EOF'
 ARGUS_KEY_TEST=<your-test-key>
 ARGUS_KEY_LINUX=<your-linux-key>
 ARGUS_KEY_MACOS=<your-macos-key>
 ARGUS_KEY_WINDOWS=<your-windows-key>
 ARGUS_KEY_DASHBOARD=<your-dashboard-key>
+CORS_ORIGINS=http://localhost,https://argus.duckdns.org
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
-CORS_ORIGINS=http://localhost:5173
 EOF
 ```
 
-### Step 2: Build and Push Docker Image
+### Step 2: Build and Push Docker Images (from local machine)
+
+#### Backend
 
 ```bash
-# Local machine
 cd backend
+
+# Build multi-arch image
 docker buildx create --name multiarch --use
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t <dockerhub-user>/argus-backend:latest \
+  -t kpzik/argus-backend:latest \
+  --push .
+```
+
+#### Frontend
+
+```bash
+cd frontend
+
+# Build multi-arch with VPS backend URL (REQUIRED — this is baked into the JS bundle)
+# Replace <vps-ip> with your actual VPS IP address
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --build-arg VITE_API_URL=http://<vps-ip>:8000 \
+  -t kpzik/argus-frontend:latest \
+  --push .
+```
+
+**⚠️ Important:** `VITE_API_URL` is a **build-time** variable. It gets inlined into the JavaScript bundle during `npm run build`. You CANNOT change it by restarting the container — you must rebuild the image.
+
+| Deployment | VITE_API_URL |
+|---|---|
+| Local (no NPM) | `http://localhost:8000` |
+| VPS without NPM | `http://<vps-ip>:8000` |
+| VPS with NPM (HTTPS) | `https://argus.duckdns.org` |
+
+**When switching from HTTP to HTTPS (after NPM setup):** rebuild the frontend image with the new URL:
+
+```bash
+cd frontend
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --build-arg VITE_API_URL=https://argus.duckdns.org \
+  -t kpzik/argus-frontend:latest \
   --push .
 ```
 
 ### Step 3: Deploy Backend on VPS
 
 ```bash
+# SSH into VPS
+ssh root@<vps-ip>
+
 # Pull and run
-docker pull <dockerhub-user>/argus-backend:latest
+docker pull kpzik/argus-backend:latest
 docker run -d \
   --name argus-backend \
-  -p 127.0.0.1:8000:8000 \
+  -p 8000:8000 \
   -v argus-data:/app/data \
   -v ~/argus-config/.env:/app/.env:ro \
   --restart unless-stopped \
-  <dockerhub-user>/argus-backend:latest
+  kpzik/argus-backend:latest
 
-# Seed API keys
+# Seed API keys (first time only)
 docker exec argus-backend python seed.py
 ```
 
@@ -131,18 +253,13 @@ docker exec argus-backend python seed.py
 ### Step 4: Deploy Frontend on VPS
 
 ```bash
-# Build frontend
-cd frontend
-docker build \
-  --build-arg VITE_API_URL=https://argus.duckdns.org \
-  -t <dockerhub-user>/argus-frontend:latest .
-
-# Run
+# Pull and run
+docker pull kpzik/argus-frontend:latest
 docker run -d \
   --name argus-frontend \
-  -p 127.0.0.1:80:80 \
+  -p 80:80 \
   --restart unless-stopped \
-  <dockerhub-user>/argus-frontend:latest
+  kpzik/argus-frontend:latest
 ```
 
 ### Step 5: Configure Nginx Proxy Manager
@@ -199,7 +316,60 @@ python3 agents/agent_linux.py
 
 ---
 
-## Docker Compose (Recommended)
+## Updating on VPS
+
+### Backend Update
+
+```bash
+# Local: rebuild and push
+cd backend
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t kpzik/argus-backend:latest \
+  --push .
+
+# VPS: pull and restart
+ssh root@<vps-ip>
+docker pull kpzik/argus-backend:latest
+docker stop argus-backend && docker rm argus-backend
+docker run -d \
+  --name argus-backend \
+  -p 127.0.0.1:8000:8000 \
+  -v argus-data:/app/data \
+  -v ~/argus-config/.env:/app/.env:ro \
+  --restart unless-stopped \
+  kpzik/argus-backend:latest
+
+# Re-seed if schema changed
+docker exec argus-backend python seed.py
+```
+
+### Frontend Update
+
+```bash
+# Local: rebuild multi-arch with VPS URL and push
+cd frontend
+# Replace <vps-ip> with your actual VPS IP (or use https://argus.duckdns.org if using NPM)
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --build-arg VITE_API_URL=http://<vps-ip>:8000 \
+  -t kpzik/argus-frontend:latest \
+  --push .
+
+# VPS: pull and restart
+ssh root@<vps-ip>
+docker pull kpzik/argus-frontend:latest
+docker stop argus-frontend && docker rm argus-frontend
+docker run -d \
+  --name argus-frontend \
+  -p 127.0.0.1:80:80 \
+  --restart unless-stopped \
+  kpzik/argus-frontend:latest
+```
+
+---
+
+## Docker Compose (VPS — Alternative)
 
 ### Backend
 
@@ -207,7 +377,7 @@ python3 agents/agent_linux.py
 # backend/docker-compose.yml
 services:
   backend:
-    image: <dockerhub-user>/argus-backend:latest
+    image: kpzik/argus-backend:latest
     container_name: argus-backend
     ports:
       - "127.0.0.1:8000:8000"
@@ -233,49 +403,10 @@ docker compose down
 |---------|-------------|
 | `docker compose up -d` | Start in background |
 | `docker compose down` | Stop and remove |
+| `docker compose down -v` | Stop, remove, and delete volume |
 | `docker compose logs -f backend` | View logs |
 | `docker compose exec backend python seed.py` | Seed API keys |
 | `docker compose ps` | Check status |
-
----
-
-## Updating
-
-### Backend Update
-
-```bash
-# Local: rebuild and push
-cd backend
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -t <dockerhub-user>/argus-backend:latest \
-  --push .
-
-# VPS: pull and restart
-docker pull <dockerhub-user>/argus-backend:latest
-docker compose down
-docker compose up -d
-```
-
-### Frontend Update
-
-```bash
-# Local: rebuild
-cd frontend
-docker build \
-  --build-arg VITE_API_URL=https://argus.duckdns.org \
-  -t <dockerhub-user>/argus-frontend:latest .
-
-# VPS: pull and restart
-docker pull <dockerhub-user>/argus-frontend:latest
-docker stop argus-frontend
-docker rm argus-frontend
-docker run -d \
-  --name argus-frontend \
-  -p 127.0.0.1:80:80 \
-  --restart unless-stopped \
-  <dockerhub-user>/argus-frontend:latest
-```
 
 ---
 
@@ -318,11 +449,32 @@ CORS is configured via environment variable:
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
 ```
 
-| Environment | CORS_ORIGINS | Behavior |
-|-------------|--------------|----------|
-| Local dev | `http://localhost:5173` | Vite dev server allowed |
-| Docker (NPM) | not set | nginx proxies, CORS never triggered |
-| DuckDNS | add domain | only if backend exposed directly |
+### When is CORS needed?
+
+| Scenario | Frontend Origin | Backend Origin | CORS Needed? |
+|----------|----------------|----------------|--------------|
+| Local dev (Vite) | `http://localhost:5173` | `http://localhost:8000` | ✅ Yes |
+| Docker local (port 80) | `http://localhost` | `http://localhost:8000` | ✅ Yes |
+| VPS with NPM | `https://argus.duckdns.org` | `https://argus.duckdns.org` | ❌ No (same origin) |
+| VPS without NPM | `http://vps-ip` | `http://vps-ip:8000` | ✅ Yes |
+
+### CORS_ORIGINS values
+
+| Environment | CORS_ORIGINS |
+|-------------|--------------|
+| Local dev | `http://localhost:5173` |
+| Docker local | `http://localhost,http://localhost:80,http://localhost:5173` |
+| VPS with NPM | not needed (same origin) |
+| VPS without NPM | `http://<vps-ip>,https://argus.duckdns.org` |
+
+### Troubleshooting CORS
+
+If you see `No 'Access-Control-Allow-Origin' header` in browser console:
+
+1. Check the **exact origin** in the error message (e.g. `http://localhost`)
+2. Add that origin to `CORS_ORIGINS` in `.env`
+3. Restart backend: `docker restart argus-backend`
+4. Verify: `curl -H "Origin: http://localhost" -v http://localhost:8000/api/stats 2>&1 | grep access-control`
 
 ---
 
@@ -331,10 +483,13 @@ CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(","
 | Problem | Solution |
 |---------|----------|
 | Container won't start | Check logs: `docker logs argus-backend` |
+| "readonly database" error | Recreate volume: `docker volume rm argus-data` then rerun |
+| "unable to open database file" | `appuser` can't write — rebuild image (Dockerfile fixes permissions) |
+| CORS error in browser | Add browser origin to CORS_ORIGINS, restart backend |
+| Frontend can't reach backend | Rebuild frontend with correct `VITE_API_URL` |
 | 502 Bad Gateway | Backend not running or wrong hostname in NPM |
 | SSL certificate fails | Verify DuckDNS IP matches VPS IP |
-| CORS errors | Check CORS_ORIGINS in .env |
-| Discord alerts not firing | Check DISCORD_WEBHOOK_URL in .env |
+| Discord alerts not firing | Check DISCORD_WEBHOOK_URL in .env, restart backend |
 | Data lost | Check `docker volume ls` — volume should exist |
 
 ---
@@ -342,13 +497,15 @@ CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(","
 ## Security Checklist
 
 - [ ] Backend port 8000 bound to `127.0.0.1` only
+- [ ] Frontend port 80 bound to `127.0.0.1` only
 - [ ] NPM handles all SSL termination
 - [ ] HTTP redirects to HTTPS
 - [ ] API keys in .env (not hardcoded)
 - [ ] .env mounted read-only in container
 - [ ] Agents use `https://` URL
-- [ ] Frontend uses `https://` API URL
+- [ ] Frontend built with `VITE_API_URL=https://argus.duckdns.org`
+- [ ] Docker containers run as non-root user (semgrep: missing-user)
 
 ---
 
-*Last updated: July 2025*
+*Last updated: July 2026*
