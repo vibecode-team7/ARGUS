@@ -24,4 +24,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
+# ADDED: Non-root user for container security (semgrep: missing-user)
+RUN adduser --disabled-password --no-create-home appuser
+USER appuser
+
 CMD ["nginx", "-g", "daemon off;"]

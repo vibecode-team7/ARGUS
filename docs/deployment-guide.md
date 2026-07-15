@@ -1,200 +1,354 @@
 # Deployment Guide
 
-## Architecture Mismatch Problem
-
-Local machine: `x86_64` (amd64)
-VPS: `aarch64` (arm64)
-
-Docker images are architecture-specific. Pulling an amd64 image on an arm64 machine gives:
+## Architecture
 
 ```
-no matching manifest for linux/arm64/v8 in the manifest list entries
+Agent/Browser → https://argus.duckdns.org (NPM:443)
+                      ↓
+              ┌───────┴───────┐
+              │  Frontend     │
+              │  (nginx:80)   │
+              └───────┬───────┘
+                      │ proxy /api/*
+              ┌───────┴───────┐
+              │  Backend      │
+              │  (FastAPI:8000)│
+              └───────┬───────┘
+                      │
+              ┌───────┴───────┐
+              │  SQLite DB    │
+              │  (argus-data) │
+              └───────────────┘
 ```
 
-## Fix: Multi-Arch Build with Docker BuildX
+---
 
-### Prerequisites on Local Machine
+## Local Development
 
-```bash
-# Check if buildx is available
-docker buildx version
-
-# If missing, install it
-# (Docker Desktop / Docker Engine 19.03+ has it built-in)
-```
-
-### Step 1: Create a multi-arch builder
-
-```bash
-docker buildx create --name multiarch --use
-docker buildx inspect --bootstrap
-```
-
-### Step 2: Build and push for both architectures
+### Backend
 
 ```bash
 cd backend
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -t <your-dockerhub-username>/argus-backend:latest \
-  --push \
-  .
+python3 -m venv ../venv
+source ../venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env
+python seed.py
+python test_data.py
+
+uvicorn main:app --reload --port 8000
 ```
 
-This single command:
-- Builds for both `amd64` (x86) and `arm64` (ARM)
-- Pushes both images as a single multi-arch manifest to Docker Hub
-- The VPS will automatically pull the correct architecture
-
-### Step 3: Pull and run on VPS
-
-First, create a `.env` file on the VPS with the API keys:
+### Frontend
 
 ```bash
-# On VPS
+cd frontend
+npm install
+npm run dev    # Starts on http://localhost:5173
+```
+
+### Test
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Send a scan
+curl -X POST http://localhost:8000/api/scan \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <your-write-key>" \
+  -d @../docs/example-payload.json
+
+# View data
+curl -H "X-API-Key: <your-read-key>" http://localhost:8000/api/findings
+```
+
+---
+
+## Production Deployment (VPS)
+
+### Prerequisites
+
+- VPS with Docker installed
+- Nginx Proxy Manager (NPM) running on port 81
+- DuckDNS domain pointing to VPS IP
+
+### Step 1: Prepare .env on VPS
+
+```bash
 mkdir -p ~/argus-config
-cat > ~/argus-config/.env << EOF
-ARGUS_KEY_TEST=<your-local-test-key>
-ARGUS_KEY_LINUX=<your-linux-agent-key>
-ARGUS_KEY_MACOS=<your-macos-agent-key>
-ARGUS_KEY_WINDOWS=<your-windows-agent-key>
-ARGUS_KEY_DASHBOARD=<your-dashboard-read-key>
+cat > ~/argus-config/.env << 'EOF'
+ARGUS_KEY_TEST=<your-test-key>
+ARGUS_KEY_LINUX=<your-linux-key>
+ARGUS_KEY_MACOS=<your-macos-key>
+ARGUS_KEY_WINDOWS=<your-windows-key>
+ARGUS_KEY_DASHBOARD=<your-dashboard-key>
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+CORS_ORIGINS=http://localhost:5173
 EOF
 ```
 
-Then pull and run, mounting the `.env` file into the container:
+### Step 2: Build and Push Docker Image
 
 ```bash
-docker pull <your-dockerhub-username>/argus-backend:latest
+# Local machine
+cd backend
+docker buildx create --name multiarch --use
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t <dockerhub-user>/argus-backend:latest \
+  --push .
+```
 
+### Step 3: Deploy Backend on VPS
+
+```bash
+# Pull and run
+docker pull <dockerhub-user>/argus-backend:latest
 docker run -d \
-  -p 8000:8000 \
+  --name argus-backend \
+  -p 127.0.0.1:8000:8000 \
   -v argus-data:/app/data \
   -v ~/argus-config/.env:/app/.env:ro \
   --restart unless-stopped \
-  <your-dockerhub-username>/argus-backend:latest
+  <dockerhub-user>/argus-backend:latest
+
+# Seed API keys
+docker exec argus-backend python seed.py
 ```
 
 | Flag | Purpose |
-|---|---|
-| `-d` | Run in background (detached) |
-| `-p 8000:8000` | Map host port 8000 to container port 8000 |
-| `-v argus-data:/app/data` | Persist SQLite database on a Docker volume |
-| `-v ~/argus-config/.env:/app/.env:ro` | Mount .env file read-only (keys never baked into image) |
-| `--restart unless-stopped` | Auto-restart if VPS reboots |
+|------|---------|
+| `-d` | Run in background |
+| `--name argus-backend` | Container name for docker commands |
+| `-p 127.0.0.1:8000:8000` | Bind to localhost only (not exposed to internet) |
+| `-v argus-data:/app/data` | Persist SQLite database |
+| `-v ~/argus-config/.env:/app/.env:ro` | Mount .env read-only |
+| `--restart unless-stopped` | Auto-restart on reboot |
 
-**Important:** Seeds must be run inside the container after first deploy:
-
-```bash
-docker exec <container-id> python seed.py
-```
-
-**Auto-migration:** If you update the code and add new columns to the database schema, the backend automatically detects and applies them at startup. No manual `ALTER TABLE` needed. Existing data is preserved.
-
-### Step 4: Verify
+### Step 4: Deploy Frontend on VPS
 
 ```bash
-# Check running containers
-docker ps
+# Build frontend
+cd frontend
+docker build \
+  --build-arg VITE_API_URL=https://argus.duckdns.org \
+  -t <dockerhub-user>/argus-frontend:latest .
 
-# View logs
-docker logs -f <container-id>
-
-# Hit the health endpoint
-curl http://localhost:8000/health
-```
-
-## Updating the Image
-
-```bash
-# Local: rebuild and push
-cd backend
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -t <your-dockerhub-username>/argus-backend:latest \
-  --push \
-  .
-
-# VPS: pull latest and restart (include .env mount and seed)
-docker pull <your-dockerhub-username>/argus-backend:latest
-docker stop <container-id>
-docker rm <container-id>
+# Run
 docker run -d \
-  -p 8000:8000 \
-  -v argus-data:/app/data \
-  -v ~/argus-config/.env:/app/.env:ro \
+  --name argus-frontend \
+  -p 127.0.0.1:80:80 \
   --restart unless-stopped \
-  <your-dockerhub-username>/argus-backend:latest
-docker exec <container-id> python seed.py
+  <dockerhub-user>/argus-frontend:latest
 ```
 
-## Alternative: Direct Transfer (No Docker Hub)
+### Step 5: Configure Nginx Proxy Manager
 
-If you don't want to use Docker Hub, transfer the image file directly:
+1. Access NPM: `http://vps-ip:81`
+2. Login with your NPM credentials
+3. **Add Proxy Host**:
+
+| Field | Value |
+|-------|-------|
+| Domain Names | `argus.duckdns.org` |
+| Scheme | `http` |
+| Forward Hostname | `localhost` |
+| Forward Port | `80` |
+| Block Common Exploits | ✅ |
+| Websockets Support | ✅ |
+
+4. **SSL Tab**:
+
+| Field | Value |
+|-------|-------|
+| SSL Certificate | Let's Encrypt |
+| Email | your-email@example.com |
+| Force SSL | ✅ |
+| HTTP/2 Support | ✅ |
+
+5. Click **Save**
+
+### Step 6: Update Agents
 
 ```bash
-# Local: build for your VPS architecture and save
-docker build --platform linux/arm64 -t argus-backend:arm64 ./backend
-docker save -o argus-backend-arm64.tar argus-backend:arm64
+# On each agent machine
+export ARGUS_BACKEND_URL="https://argus.duckdns.org"
 
-# Transfer to VPS
-scp argus-backend-arm64.tar user@your-vps:~
-
-# VPS: load and run
-docker load -i argus-backend-arm64.tar
-docker run -d -p 8000:8000 -v argus-data:/app/data --restart unless-stopped argus-backend:arm64
+# Run agent
+python3 agents/agent_linux.py
 ```
 
-## VPS Firewall Setup
-
-Ensure port 8000 is open:
+### Step 7: Verify
 
 ```bash
-# Ubuntu (ufw)
-sudo ufw allow 8000/tcp
-sudo ufw reload
+# Check backend
+curl https://argus.duckdns.org/health
 
-# Check cloud provider firewall (DigitalOcean, AWS, etc.)
-# Add an inbound rule for TCP port 8000
+# Check frontend
+curl -I https://argus.duckdns.org
+
+# Check agent
+python3 agents/agent_linux.py
+
+# Check Discord alerts
+# (Send a scan with severity=high, check Discord channel)
 ```
 
-## Docker Compose (Optional, for future full-stack)
+---
+
+## Docker Compose (Recommended)
+
+### Backend
 
 ```yaml
-# docker-compose.yml
+# backend/docker-compose.yml
 services:
   backend:
-    image: <your-dockerhub-username>/argus-backend:latest
+    image: <dockerhub-user>/argus-backend:latest
+    container_name: argus-backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - argus-data:/app/data
+      - ~/argus-config/.env:/app/.env:ro
     restart: unless-stopped
 
 volumes:
   argus-data:
 ```
 
-Then on VPS:
+```bash
+cd backend
+docker compose up -d
+docker compose logs -f backend
+docker compose down
+```
+
+### Common Commands
+
+| Command | Description |
+|---------|-------------|
+| `docker compose up -d` | Start in background |
+| `docker compose down` | Stop and remove |
+| `docker compose logs -f backend` | View logs |
+| `docker compose exec backend python seed.py` | Seed API keys |
+| `docker compose ps` | Check status |
+
+---
+
+## Updating
+
+### Backend Update
 
 ```bash
+# Local: rebuild and push
+cd backend
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t <dockerhub-user>/argus-backend:latest \
+  --push .
+
+# VPS: pull and restart
+docker pull <dockerhub-user>/argus-backend:latest
+docker compose down
 docker compose up -d
 ```
 
+### Frontend Update
+
+```bash
+# Local: rebuild
+cd frontend
+docker build \
+  --build-arg VITE_API_URL=https://argus.duckdns.org \
+  -t <dockerhub-user>/argus-frontend:latest .
+
+# VPS: pull and restart
+docker pull <dockerhub-user>/argus-frontend:latest
+docker stop argus-frontend
+docker rm argus-frontend
+docker run -d \
+  --name argus-frontend \
+  -p 127.0.0.1:80:80 \
+  --restart unless-stopped \
+  <dockerhub-user>/argus-frontend:latest
+```
+
+---
+
+## Alerting Setup
+
+### Discord
+
+1. Create Discord webhook:
+   - Server Settings → Integrations → Webhooks → New Webhook
+   - Copy webhook URL
+
+2. Add to `.env`:
+   ```
+   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+   ```
+
+3. Restart backend container
+
+### Slack
+
+1. Create Slack webhook:
+   - api.slack.com → Incoming Webhooks → Add New Webhook
+   - Copy webhook URL
+
+2. Add to `.env`:
+   ```
+   SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+   ```
+
+3. Restart backend container
+
+---
+
 ## CORS Configuration
 
-The frontend and backend run on separate containers, so CORS must be enabled on the backend.
-
-In `backend/main.py`, `CORSMiddleware` is already added with `allow_origins=["*"]` for development.
-
-**Before going to production**, restrict origins to your actual frontend URL:
+CORS is configured via environment variable:
 
 ```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://your-frontend-domain.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# backend/main.py
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
 ```
+
+| Environment | CORS_ORIGINS | Behavior |
+|-------------|--------------|----------|
+| Local dev | `http://localhost:5173` | Vite dev server allowed |
+| Docker (NPM) | not set | nginx proxies, CORS never triggered |
+| DuckDNS | add domain | only if backend exposed directly |
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Container won't start | Check logs: `docker logs argus-backend` |
+| 502 Bad Gateway | Backend not running or wrong hostname in NPM |
+| SSL certificate fails | Verify DuckDNS IP matches VPS IP |
+| CORS errors | Check CORS_ORIGINS in .env |
+| Discord alerts not firing | Check DISCORD_WEBHOOK_URL in .env |
+| Data lost | Check `docker volume ls` — volume should exist |
+
+---
+
+## Security Checklist
+
+- [ ] Backend port 8000 bound to `127.0.0.1` only
+- [ ] NPM handles all SSL termination
+- [ ] HTTP redirects to HTTPS
+- [ ] API keys in .env (not hardcoded)
+- [ ] .env mounted read-only in container
+- [ ] Agents use `https://` URL
+- [ ] Frontend uses `https://` API URL
+
+---
+
+*Last updated: July 2025*

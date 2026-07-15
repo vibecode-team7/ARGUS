@@ -4,26 +4,42 @@
 version: 2
 updates:
   # Node / npm — active only if package.json exists at the repo root.
+  # CHANGED: directory updated from "/" to "/frontend" where package.json lives
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/frontend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+    reviewers:
+      - "KiZINnO"
+    labels:
+      - "dependencies"
+    # ADDED: cooldown period to prevent malicious newly published packages
+    cooldown:
+      default-days: 7
     groups:
       # One grouped PR for minor/patch bumps — less noise for beginners.
       minor-and-patch:
         update-types: ["minor", "patch"]
 
   # Python / pip — active only if requirements.txt / pyproject.toml exists.
+  # CHANGED: directory updated from "/" to "/backend" where requirements.txt lives
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/backend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+    reviewers:
+      - "KiZINnO"
+    labels:
+      - "dependencies"
+    # ADDED: cooldown period to prevent malicious newly published packages
+    cooldown:
+      default-days: 7
 
   # GitHub Actions themselves — keeps pinned action versions patched.
   - package-ecosystem: "github-actions"
@@ -32,3 +48,38 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(ci)"
+    reviewers:
+      - "KiZINnO"
+    labels:
+      - "dependencies"
+    # ADDED: cooldown period to prevent malicious newly published action versions
+    cooldown:
+      default-days: 7
+
+  # ADDED: Docker base image updates for backend Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(docker)"
+    reviewers:
+      - "KiZINnO"
+    labels:
+      - "dependencies"
+    cooldown:
+      default-days: 7
+
+  # ADDED: Docker base image updates for frontend Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(docker)"
+    reviewers:
+      - "KiZINnO"
+    labels:
+      - "dependencies"
+    cooldown:
+      default-days: 7

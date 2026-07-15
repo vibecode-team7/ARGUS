@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -17,9 +18,14 @@ from alerting import send_high_risk_alert
 
 app = FastAPI(title="ARGUS Backend", version="0.1.0")
 
+# CHANGED: CORS origins now read from env variable instead of wildcard "*"
+# In production (Docker with nginx proxy), CORS is never triggered.
+# For local dev, allow Vite dev server. For DuckDNS, add domain to CORS_ORIGINS.
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

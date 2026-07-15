@@ -18,18 +18,36 @@ ARGUS/
 │   ├── main.py             ← FastAPI app, routes, Pydantic models
 │   ├── database.py         ← SQLAlchemy ORM, migrations, DB init
 │   ├── auth.py             ← API key verification (SHA-256 hashing)
+│   ├── alerting.py         ← Discord/Slack webhook alerts
 │   ├── seed.py             ← Seeds API keys from .env into DB
 │   ├── test_data.py        ← Seeds sample scan data for dev
 │   ├── requirements.txt    ← fastapi[standard], sqlalchemy
 │   ├── Dockerfile          ← Python 3.12-slim, uvicorn entrypoint
+│   ├── docker-compose.yml  ← Docker Compose config
 │   ├── .env.example        ← API key template (committed)
 │   ├── .env                ← Real keys (gitignored)
 │   └── data/argus.db       ← SQLite database (gitignored)
+├── frontend/
+│   ├── src/                ← React components, pages, hooks
+│   ├── package.json        ← React 19, Vite 8, TailwindCSS 4
+│   ├── Dockerfile          ← Multi-stage build (node → nginx)
+│   └── nginx.conf          ← Reverse proxy config
+├── agents/
+│   ├── agent_linux.py      ← Linux endpoint scanner
+│   ├── agent_macos.py      ← macOS endpoint scanner
+│   └── agent_windows.py    ← Windows endpoint scanner
 ├── docs/
 │   ├── payload-schema.json ← JSON Schema for agent payloads
 │   ├── example-payload.json
 │   ├── backend-plan.md     ← DB schema, API docs, testing guide
-│   └── deployment-guide.md ← Docker multi-arch build, VPS deploy
+│   ├── deployment-guide.md ← Docker multi-arch build, VPS deploy
+│   └── architecture.md     ← Mermaid diagrams, system design
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml          ← Lint, test, Docker build
+│   │   └── security.yml    ← Semgrep, Trivy, Gitleaks
+│   ├── dependabot.yml      ← Auto-update dependencies
+│   └── CODEOWNERS          ← PR reviewer assignments
 └── venv/                   ← Python 3.12 virtualenv (gitignored)
 ```
 
@@ -43,8 +61,11 @@ ARGUS/
 | ORM         | SQLAlchemy (DeclarativeBase)   |
 | Database    | SQLite (WAL mode)              |
 | Auth        | SHA-256 hashed API keys        |
-| Deployment  | Docker, Docker BuildX (multi-arch: amd64 + arm64) |
-| Dashboard   | HTML, TailwindCSS, Vanilla JS *(planned)* |
+| Frontend    | React 19, Vite 8, TailwindCSS 4 |
+| Alerting    | Discord / Slack webhooks       |
+| Deployment  | Docker, Docker Compose, Nginx Proxy Manager |
+| CI/CD       | GitHub Actions, Semgrep, Trivy, Dependabot |
+| SSL         | Let's Encrypt (via NPM)        |
 
 ---
 

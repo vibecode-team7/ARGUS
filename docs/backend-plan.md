@@ -14,13 +14,16 @@ backend/
 ├── main.py              # FastAPI app, routes, middleware
 ├── database.py          # SQLAlchemy models + engine + session + auto-migration
 ├── auth.py              # API key hashing + verification
+├── alerting.py          # Discord/Slack webhook alerts
 ├── seed.py              # One-time script to seed API keys
 ├── test_data.py         # Script to seed test scan data
 ├── requirements.txt     # Dependencies
 ├── Dockerfile           # Container build
+├── docker-compose.yml   # Docker Compose config
 ├── .env                 # API keys (gitignored, never committed)
 ├── .env.example         # Template for .env (committed)
-└── .dockerignore        # Excludes .env from Docker build context
+├── .dockerignore        # Excludes .env from Docker build context
+└── README.md            # Backend-specific docs
 ```
 
 ## Endpoints
@@ -33,6 +36,7 @@ backend/
 | `GET` | `/api/findings/{id}` | `X-API-Key` (read) | Single scan detail |
 | `GET` | `/api/hosts` | `X-API-Key` (read) | Unique hosts with latest scan + risk summary |
 | `GET` | `/api/stats` | `X-API-Key` (read) | Summary counts for dashboard |
+| `GET` | `/api/trends` | `X-API-Key` (read) | Findings over time (supports `?days=`) |
 
 ## Database Schema
 
@@ -89,12 +93,22 @@ Two roles: **write** (agents) and **read** (dashboard).
 | `ARGUS_KEY_WINDOWS` | write | Windows agent |
 | `ARGUS_KEY_DASHBOARD` | read | Dashboard JS |
 
+### Other Environment Variables
+
+| Env Variable | Purpose | Example |
+|---|---|---|
+| `DISCORD_WEBHOOK_URL` | Discord alert webhook | `https://discord.com/api/webhooks/...` |
+| `SLACK_WEBHOOK_URL` | Slack alert webhook | `https://hooks.slack.com/services/...` |
+| `CORS_ORIGINS` | CORS allowed origins | `http://localhost:5173` |
+| `ARGUS_DB_DIR` | Override DB directory | `/custom/path` |
+
 1. Client sends `X-API-Key: <plaintext>` in header
 2. Backend SHA-256 hashes the incoming key
 3. Looks up hash + role match in `api_keys` table
 4. `POST /api/scan` requires `role == "write"`
 5. All `GET /api/*` endpoints require `role == "read"`
 6. If not found or role mismatch → `401 Unauthorized`
+7. If high-severity findings detected → Discord/Slack alert
 
 ## Testing Without Agents
 
@@ -231,18 +245,16 @@ docker buildx build \
   --push \
   .
 
-# On VPS: create .env, pull, run, seed
-mkdir -p ~/argus-config
-# Edit ~/argus-config/.env with your production keys
-
+# On VPS: pull and run with docker-compose
 docker pull <your-dockerhub>/argus-backend:latest
-docker run -d \
-  -p 8000:8000 \
-  -v argus-data:/app/data \
-  -v ~/argus-config/.env:/app/.env:ro \
-  --restart unless-stopped \
-  <your-dockerhub>/argus-backend:latest
-docker exec <container-id> python seed.py
+docker compose up -d
+docker compose exec backend python seed.py
+
+# View logs
+docker compose logs -f backend
+
+# Stop
+docker compose down
 ```
 
 ## Auto-Migration

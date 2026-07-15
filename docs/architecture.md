@@ -11,39 +11,40 @@ A decentralized security framework that detects **Shadow AI** (unauthorized AI t
 ```mermaid
 graph TB
     subgraph "Endpoint Agents"
-        LA[🖥️ Linux Agent<br>agent_linux.py<br>Python + psutil]
-        MA[🍎 macOS Agent<br>agent_macos.py<br>Python + psutil]
-        WA[🪟 Windows Agent<br>agent_windows.py<br>Python + psutil]
+        LA["🖥️ Linux Agent<br>agent_linux.py<br>Python + psutil"]
+        MA["🍎 macOS Agent<br>agent_macos.py<br>Python + psutil"]
+        WA["🪟 Windows Agent<br>agent_windows.py<br>Python + psutil"]
     end
 
-    subgraph "Backend — FastAPI + SQLite"
-        LB[Load Balancer / VPS<br>Port 8000]
-        API[FastAPI App<br>main.py]
-        AUTH[Auth Layer<br>auth.py<br>SHA-256 key verification]
-        DB[SQLite DB<br>argus.db<br>WAL mode]
+    subgraph "Production (VPS)"
+        NPM["Nginx Proxy Manager<br>Port 443 (HTTPS)<br>Let's Encrypt SSL"]
+        FE["Frontend Container<br>React + Vite<br>Port 80 (nginx)"]
+        BE["Backend Container<br>FastAPI<br>Port 8000 (internal)"]
+        DB[("SQLite DB<br>argus-data volume")]
     end
 
     subgraph "Detection Targets"
-        OLLAMA[Ollama<br>local_llm<br>Port 11434]
-        CURSOR[Cursor IDE<br>ai_ide<br>~/.cursor]
-        MCP[MCP Configs<br>mcp_server<br>.mcp.json]
+        OLLAMA["Ollama<br>local_llm<br>Port 11434"]
+        CURSOR["Cursor IDE<br>ai_ide<br>~/.cursor"]
+        MCP["MCP Configs<br>mcp_server<br>.mcp.json"]
     end
 
     subgraph "Consumers"
-        DASH[Dashboard<br>HTML + TailwindCSS + JS]
-        CURL[Dev Tools<br>curl / Postman]
+        DASH["Dashboard<br>React + TailwindCSS"]
+        CURL["Dev Tools<br>curl / Postman"]
     end
 
-    LA -->|"POST /api/scan<br>X-API-Key: write"| LB
-    MA -->|"POST /api/scan<br>X-API-Key: write"| LB
-    WA -->|"POST /api/scan<br>X-API-Key: write"| LB
+    LA -->|"POST /api/scan<br>X-API-Key: write"| NPM
+    MA -->|"POST /api/scan<br>X-API-Key: write"| NPM
+    WA -->|"POST /api/scan<br>X-API-Key: write"| NPM
 
-    LB --> API
-    API --> AUTH
-    AUTH --> DB
+    NPM --> FE
+    NPM --> BE
+    FE -->|"proxy /api/*"| BE
+    BE --> DB
 
-    DASH -->|"GET /api/*<br>X-API-Key: read"| LB
-    CURL -->|"GET /api/*<br>X-API-Key: read"| LB
+    DASH -->|"GET /api/*<br>X-API-Key: read"| NPM
+    CURL -->|"GET /api/*<br>X-API-Key: read"| NPM
 
     LA -.->|scans for| OLLAMA
     LA -.->|scans for| CURSOR
@@ -64,14 +65,17 @@ graph TB
 sequenceDiagram
     autonumber
     participant Agent as Agent
+    participant NPM as Nginx Proxy Manager
     participant API as FastAPI
     participant Auth as auth.py
     participant DB as SQLite
+    participant Alert as Alerting
 
     Agent->>Agent: Scan machine for AI tools<br>(Ollama, Cursor, MCP)
 
-    Agent->>API: POST /api/scan<br>Headers: Content-Type: application/json<br>Headers: X-API-Key: <write-key><br>Body: { hostname, os, findings: [...] }
+    Agent->>NPM: POST /api/scan<br>Headers: Content-Type: application/json<br>Headers: X-API-Key: <write-key><br>Body: { hostname, os, findings: [...] }
 
+    NPM->>API: Forward request (HTTPS → HTTP)
     API->>Auth: verify_write_key(key)
     Auth->>Auth: SHA-256 hash the key
     Auth->>DB: SELECT FROM api_keys<br>WHERE key_hash = ?<br>AND role = 'write'<br>AND is_active = 1
@@ -86,6 +90,10 @@ sequenceDiagram
         end
         DB-->>API: committed
         API-->>Agent: 201 Created<br>{ id: 42, hostname: "dev-01", findings_count: 2 }
+
+        Note over API,Alert: If high-severity findings detected
+        API->>Alert: send_high_risk_alert(hostname, findings)
+        Alert->>Alert: POST to Discord / Slack webhook
     else Key invalid or wrong role
         DB-->>Auth: None
         Auth-->>API: 401 Unauthorized
@@ -99,12 +107,14 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant Dash as Dashboard
+    participant NPM as Nginx Proxy Manager
     participant API as FastAPI
     participant Auth as auth.py
     participant DB as SQLite
 
-    Dash->>API: GET /api/hosts<br>Headers: X-API-Key: <read-key>
+    Dash->>NPM: GET /api/hosts<br>Headers: X-API-Key: <read-key>
 
+    NPM->>API: Forward request
     API->>Auth: verify_read_key(key)
     Auth->>DB: SELECT FROM api_keys<br>WHERE key_hash = ?<br>AND role = 'read'
     DB-->>Auth: ApiKey row
@@ -239,65 +249,167 @@ graph TB
     subgraph "Local Development"
         DEV["Dev Machine<br>x86_64 / amd64"]
         UVICORN["uvicorn main:app<br>--reload --port 8000"]
+        VITE["Vite Dev Server<br>localhost:5173"]
         LOCAL_DB["backend/data/argus.db"]
     end
 
     subgraph "Production (VPS)"
         VPS["VPS<br>aarch64 / arm64"]
-        DOCKER["Docker Container<br>python:3.12-slim"]
+        NPM["Nginx Proxy Manager<br>Port 81 (admin)<br>Port 443 (HTTPS)"]
+        FE_CONTAINER["Frontend Container<br>nginx:alpine<br>Port 80"]
+        BE_CONTAINER["Backend Container<br>python:3.12-slim<br>Port 8000 (internal)"]
         VOL_DATA["Volume: argus-data<br>/app/data/argus.db"]
         VOL_ENV["Volume: ~/argus-config/.env<br>/app/.env (read-only)"]
-        UFW["Firewall<br>Port 8000 open"]
+        UFW["Firewall<br>Port 443 open"]
     end
 
-    subgraph "CI/CD"
-        BUILDX["Docker BuildX<br>linux/amd64 + arm64"]
+    subgraph "CI/CD Pipeline"
+        GITHUB["GitHub Actions<br>feature/backend branch"]
+        CI["ci.yml<br>Lint + Test + Docker Build"]
+        SECURITY["security.yml<br>Semgrep + Trivy + Gitleaks"]
+        DEPENDABOT["dependabot.yml<br>Auto-update deps"]
         HUB["Docker Hub<br>argus-backend:latest"]
     end
 
+    subgraph "SSL/TLS"
+        DUCKDNS["DuckDNS<br>argus.duckdns.org"]
+        LETSENCRYPT["Let's Encrypt<br>Free SSL Certificate"]
+    end
+
     DEV -->|"docker buildx build<br>--push"| HUB
-    BUILDX --> HUB
+    GITHUB --> CI
+    GITHUB --> SECURITY
+    GITHUB --> DEPENDABOT
+    CI --> HUB
 
-    HUB -->|"docker pull"| DOCKER
-    DOCKER --> VOL_DATA
-    DOCKER --> VOL_ENV
-    DOCKER -->|"runs on"| VPS
-    VPS -->|"port 8000"| UFW
+    HUB -->|"docker pull"| BE_CONTAINER
+    BE_CONTAINER --> VOL_DATA
+    BE_CONTAINER --> VOL_ENV
+    NPM --> FE_CONTAINER
+    NPM --> BE_CONTAINER
+    DUCKDNS --> VPS
+    LETSENCRYPT --> NPM
 
+    DEV -.->|local dev| VITE
     DEV -.->|local dev| UVICORN
     UVICORN --> LOCAL_DB
 
     style VPS fill:#1565C0,color:#fff
     style HUB fill:#0277BD,color:#fff
-    style BUILDX fill:#F57C00,color:#fff
+    style NPM fill:#00897B,color:#fff
+    style LETSENCRYPT fill:#43A047,color:#fff
+```
+
+---
+
+## CI/CD Pipeline
+
+```mermaid
+flowchart LR
+    subgraph "Triggers"
+        PUSH["Push to main"]
+        PR["Pull Request"]
+        SCHEDULE["Weekly schedule"]
+    end
+
+    subgraph "ci.yml"
+        LINT["Lint<br>ruff / oxlint"]
+        TEST["Test<br>pytest / npm test"]
+        DOCKER_BUILD["Docker Build<br>backend + frontend"]
+        DOCKER_SMOKE["Smoke Test<br>curl health endpoint"]
+    end
+
+    subgraph "security.yml"
+        SEMGREP["Semgrep SAST<br>Python + JavaScript"]
+        TRIVY["Trivy<br>Container scan"]
+        GITLEAKS["Gitleaks<br>Secrets scan"]
+    end
+
+    subgraph "dependabot.yml"
+        PIP["pip<br>backend deps"]
+        NPM["npm<br>frontend deps"]
+        DOCKER_DEP["Docker<br>base images"]
+        ACTIONS["GitHub Actions<br>workflow versions"]
+    end
+
+    PUSH --> LINT
+    PR --> LINT
+    LINT --> TEST
+    TEST --> DOCKER_BUILD
+    DOCKER_BUILD --> DOCKER_SMOKE
+
+    PUSH --> SEMGREP
+    PR --> SEMGREP
+    SEMGREP --> TRIVY
+    TRIVY --> GITLEAKS
+
+    SCHEDULE --> PIP
+    SCHEDULE --> NPM
+    SCHEDULE --> DOCKER_DEP
+    SCHEDULE --> ACTIONS
+```
+
+---
+
+## Alerting Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as Agent
+    participant Backend as FastAPI Backend
+    participant Alerting as alerting.py
+    participant Discord as Discord Webhook
+    participant Slack as Slack Webhook
+
+    Agent->>Backend: POST /api/scan<br>(findings with severity=high)
+    Backend->>Backend: Store in database
+    Backend->>Alerting: send_high_risk_alert(hostname, findings)
+
+    alt Discord configured
+        Alerting->>Discord: POST webhook<br>{ content: "🚨 High-risk detected..." }
+        Discord-->>Alerting: 204 No Content
+    end
+
+    alt Slack configured
+        Alerting->>Slack: POST webhook<br>{ text: "🚨 High-risk detected..." }
+        Slack-->>Alerting: 200 OK
+    end
 ```
 
 ---
 
 ## Environment Variables
 
-| Variable            | Purpose                              | Example Value               |
-|---------------------|--------------------------------------|------------------------------|
-| `ARGUS_KEY_TEST`    | Write key for local dev / curl       | `test-secret-key-abc123`    |
-| `ARGUS_KEY_LINUX`   | Write key for Linux agent            | `linux-agent-key-xyz789`    |
-| `ARGUS_KEY_MACOS`   | Write key for macOS agent            | `macos-agent-key-uvw456`    |
-| `ARGUS_KEY_WINDOWS` | Write key for Windows agent          | `windows-agent-key-rst123`  |
-| `ARGUS_KEY_DASHBOARD`| Read key for dashboard              | `dashboard-read-key-opq987` |
-| `ARGUS_DB_DIR`      | Override DB directory (optional)     | `/custom/path`              |
+| Variable | Purpose | Example Value |
+|----------|---------|---------------|
+| `ARGUS_KEY_TEST` | Write key for local dev / curl | `test-secret-key-abc123` |
+| `ARGUS_KEY_LINUX` | Write key for Linux agent | `linux-agent-key-xyz789` |
+| `ARGUS_KEY_MACOS` | Write key for macOS agent | `macos-agent-key-uvw456` |
+| `ARGUS_KEY_WINDOWS` | Write key for Windows agent | `windows-agent-key-rst123` |
+| `ARGUS_KEY_DASHBOARD` | Read key for dashboard | `dashboard-read-key-opq987` |
+| `DISCORD_WEBHOOK_URL` | Discord alert webhook | `https://discord.com/api/webhooks/...` |
+| `SLACK_WEBHOOK_URL` | Slack alert webhook | `https://hooks.slack.com/services/...` |
+| `CORS_ORIGINS` | CORS allowed origins | `http://localhost:5173` |
+| `ARGUS_DB_DIR` | Override DB directory | `/custom/path` |
+| `VITE_API_URL` | Backend URL for frontend | `https://argus.duckdns.org` |
+| `ARGUS_BACKEND_URL` | Backend URL for agents | `https://argus.duckdns.org` |
 
 ---
 
 ## Summary
 
-| Component     | Role                                          | File(s)                         |
-|---------------|-----------------------------------------------|---------------------------------|
-| **Agents**    | Scan endpoints for Shadow AI, POST findings   | `agents/*.py`                   |
-| **Backend**   | Ingest, store, query scan data                | `backend/main.py`               |
-| **Auth**      | Verify API keys via SHA-256 hashing           | `backend/auth.py`               |
-| **Database**  | Persist scans + findings (SQLite)             | `backend/database.py`           |
-| **Seeders**   | Initialize API keys + test data               | `backend/seed.py`, `test_data.py` |
-| **Dashboard** | Visualize hosts, findings, risk scores        | `dashboard/` (planned)          |
-| **Docker**    | Multi-arch containerized deployment           | `backend/Dockerfile`            |
+| Component | Role | File(s) |
+|-----------|------|---------|
+| **Agents** | Scan endpoints for Shadow AI, POST findings | `agents/*.py` |
+| **Backend** | Ingest, store, query scan data | `backend/main.py` |
+| **Auth** | Verify API keys via SHA-256 hashing | `backend/auth.py` |
+| **Database** | Persist scans + findings (SQLite) | `backend/database.py` |
+| **Alerting** | Discord/Slack notifications for high-severity | `backend/alerting.py` |
+| **Frontend** | Dashboard UI (React + TailwindCSS) | `frontend/src/` |
+| **Docker** | Containerized deployment | `backend/Dockerfile`, `frontend/Dockerfile` |
+| **CI/CD** | Automated testing, security scanning | `.github/workflows/` |
+| **SSL** | HTTPS via Let's Encrypt | Nginx Proxy Manager |
 
 ---
 
