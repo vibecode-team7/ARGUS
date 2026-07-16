@@ -5,10 +5,11 @@ import { healthCheck, fetchHosts } from "../../lib/api";
 import StatusDot from "../StatusDot";
 
 const PAGE_TITLES = {
-  "/": "Dashboard",
+  "/dashboard": "Dashboard",
   "/hosts": "Hosts",
   "/findings": "Findings",
   "/trends": "Trends",
+  "/guide": "Guides",
 };
 
 export default function Header({ onMenuClick }) {
