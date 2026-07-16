@@ -1,13 +1,14 @@
 import { NavLink, useNavigate } from "react-router";
-import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp, LogOut } from "lucide-react";
+import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp, BookOpen, LogOut } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
 import { useAuth } from "../../context/AuthContext";
 
 const NAV_ITEMS = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/hosts", icon: Server, label: "Hosts" },
   { to: "/findings", icon: FileWarning, label: "Findings" },
   { to: "/trends", icon: TrendingUp, label: "Trends" },
+  { to: "/guide", icon: BookOpen, label: "Guides" },
 ];
 
 export default function Sidebar({ open, onClose }) {
@@ -58,7 +59,7 @@ export default function Sidebar({ open, onClose }) {
             <NavLink
               key={to}
               to={to}
-              end={to === "/"}
+              end={to === "/dashboard" || to === "/hosts"}
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors

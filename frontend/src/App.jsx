@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router";
 import Layout from "./components/layout/Layout";
 import { useAuth } from "./context/AuthContext";
 
+const GuidePage = lazy(() => import("./pages/GuidePage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const HostsPage = lazy(() => import("./pages/HostsPage"));
 const HostDetailPage = lazy(() => import("./pages/HostDetailPage"));
@@ -34,6 +35,15 @@ function RequireAuth({ children }) {
 const App = () => {
   return (
     <Routes>
+      {/* Public routes */}
+      <Route
+        index
+        element={
+          <Suspense fallback={<Loading />}>
+            <GuidePage />
+          </Suspense>
+        }
+      />
       <Route
         path="login"
         element={
@@ -42,6 +52,8 @@ const App = () => {
           </Suspense>
         }
       />
+
+      {/* Authenticated routes */}
       <Route
         element={
           <RequireAuth>
@@ -50,7 +62,7 @@ const App = () => {
         }
       >
         <Route
-          index
+          path="dashboard"
           element={
             <Suspense fallback={<Loading />}>
               <DashboardPage />
