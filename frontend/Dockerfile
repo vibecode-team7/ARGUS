@@ -26,6 +26,10 @@ EXPOSE 80
 
 # ADDED: Non-root user for container security (semgrep: missing-user)
 RUN adduser --disabled-password --no-create-home appuser
+
+# CHANGED: Grant appuser access to nginx runtime, cache, and log dirs
+RUN chown -R appuser:appuser /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /run
+
 USER appuser
 
 CMD ["nginx", "-g", "daemon off;"]

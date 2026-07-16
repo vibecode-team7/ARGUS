@@ -133,6 +133,7 @@ Keys are defined in `backend/.env` and seeded into the database via `python seed
 | `ARGUS_KEY_MACOS` | Yes | — | Write API key for macOS agent |
 | `ARGUS_KEY_WINDOWS` | Yes | — | Write API key for Windows agent |
 | `ARGUS_KEY_DASHBOARD` | Yes | — | Read API key for dashboard |
+| `CORS_ORIGINS` | No | `http://localhost:5173` | Comma-separated allowed origins. Add `http://localhost` if running frontend container on port 80 |
 | `DISCORD_WEBHOOK_URL` | No | — | Discord webhook for alerts |
 | `SLACK_WEBHOOK_URL` | No | — | Slack webhook for alerts |
 | `ARGUS_DB_DIR` | No | `backend/data/` | Override SQLite database directory |
@@ -169,12 +170,22 @@ New columns are added automatically at startup via `PRAGMA table_info()` + `ALTE
 ### Reset
 
 ```bash
-# Local: delete database file
+# Local (no Docker): delete database file
 rm -rf backend/data/
 python backend/seed.py
 python backend/test_data.py
 
-# Docker: delete volume and re-seed
+# Docker (local): delete volume and re-seed
+docker stop argus-backend && docker rm argus-backend
+docker volume rm argus-data
+docker run -d -p 8000:8000 \
+  -v argus-data:/app/data \
+  -v $(pwd)/.env:/app/.env:ro \
+  --name argus-backend \
+  argus-backend:latest
+docker exec argus-backend python seed.py
+
+# Docker (VPS): delete volume and re-seed
 docker compose down -v
 docker compose up -d
 docker compose exec backend python seed.py
@@ -182,31 +193,178 @@ docker compose exec backend python seed.py
 
 ---
 
-## Docker — Local Build
+## Docker — Local Testing
 
-### Single Architecture
+### Build and Run Backend
 
 ```bash
 cd backend
+
+# Build image
 docker build -t argus-backend:latest .
-docker compose up -d
+
+# Run container
+docker run -d -p 8000:8000 \
+  -v argus-data:/app/data \
+  -v $(pwd)/.env:/app/.env:ro \
+  --name argus-backend \
+  argus-backend:latest
+
+# Seed API keys (first time only)
+docker exec argus-backend python seed.py
 ```
 
-### Multi-Architecture (amd64 + arm64)
+### Build and Run Frontend (with backend)
+
+```bash
+cd frontend
+
+# Build image (points to local backend)
+docker build \
+  --build-arg VITE_API_URL=http://localhost:8000 \
+  -t argus-frontend:latest .
+
+# Run container
+docker run -d -p 80:80 --name argus-frontend argus-frontend:latest
+```
+
+### CORS Configuration
+
+The frontend container runs on port 80, which is a different origin from port 8000. Add both origins to `.env`:
+
+```
+CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
+```
+
+Restart the backend after changing `.env`:
+
+```bash
+docker restart argus-backend
+```
+
+### Verify
+
+```bash
+# Backend health
+curl http://localhost:8000/health
+
+# Frontend
+# Open http://localhost in browser → login with dashboard read key
+
+# Backend logs
+docker logs argus-backend
+
+# Frontend logs
+docker logs argus-frontend
+```
+
+### Stop and Clean Up
+
+```bash
+# Stop containers
+docker stop argus-backend argus-frontend
+docker rm argus-backend argus-frontend
+
+# Remove volumes (deletes database)
+docker volume rm argus-data
+```
+
+### Reset Database (Docker)
+
+```bash
+docker stop argus-backend && docker rm argus-backend
+docker volume rm argus-data
+docker run -d -p 8000:8000 \
+  -v argus-data:/app/data \
+  -v $(pwd)/.env:/app/.env:ro \
+  --name argus-backend \
+  argus-backend:latest
+docker exec argus-backend python seed.py
+docker exec argus-backend python test_data.py
+```
+
+---
+
+## Docker — VPS Deployment
+
+### Build and Push (from your local machine)
 
 ```bash
 cd backend
+
+# Build multi-arch image and push to Docker Hub
 docker buildx create --name multiarch --use
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t <your-dockerhub>/argus-backend:latest \
+  -t kpzik/argus-backend:latest \
   --push .
 ```
 
-### First-Time Seed (after container starts)
+### Prepare VPS
 
 ```bash
+# SSH into VPS
+ssh root@<vps-ip>
+
+# Create config directory
+mkdir -p ~/argus-config
+
+# Create .env with production keys
+cat > ~/argus-config/.env << 'EOF'
+ARGUS_KEY_TEST=your_test_key_here
+ARGUS_KEY_LINUX=your_linux_key_here
+ARGUS_KEY_MACOS=your_macos_key_here
+ARGUS_KEY_WINDOWS=your_windows_key_here
+ARGUS_KEY_DASHBOARD=your_dashboard_key_here
+CORS_ORIGINS=http://localhost,https://argus.duckdns.org
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+EOF
+```
+
+### Pull and Run (on VPS)
+
+```bash
+# Pull and start
+cd ~/argus-backend
+docker compose up -d
+
+# Seed API keys (first time only)
 docker compose exec backend python seed.py
+```
+
+### Verify (on VPS)
+
+```bash
+# Check container is running
+docker compose ps
+
+# View logs
+docker compose logs -f backend
+
+# Hit health endpoint
+curl http://localhost:8000/health
+```
+
+### Update (on VPS)
+
+```bash
+cd ~/argus-backend
+
+# Pull new image and recreate
+docker compose pull
+docker compose up -d
+
+# Re-seed (if schema changed)
+docker compose exec backend python seed.py
+```
+
+### Firewall
+
+Ensure port 8000 is open (or only accessible from NPM):
+
+```bash
+sudo ufw allow 8000/tcp
+sudo ufw reload
 ```
 
 ---
@@ -300,12 +458,12 @@ docker compose exec backend python seed.py
 
 ## Docker Compose Reference
 
-The `docker-compose.yml` file:
+The `docker-compose.yml` file (for VPS):
 
 ```yaml
 services:
   backend:
-    image: <your-dockerhub>/argus-backend:latest
+    image: kpzik/argus-backend:latest
     container_name: argus-backend
     ports:
       - "8000:8000"
@@ -363,18 +521,36 @@ sudo ufw reload
 
 ### "Invalid or inactive API key"
 - Check you're using the actual key value, not the env variable name
-- Verify the key is seeded: `docker compose exec backend python seed.py`
+- Verify the key is seeded: `docker exec argus-backend python seed.py`
+
+### "attempt to write a readonly database" / "unable to open database file"
+- The `appuser` in the Dockerfile can't write to the data directory
+- Recreate the volume: `docker stop argus-backend && docker rm argus-backend && docker volume rm argus-data`
+- Rebuild and run again (see "Build and Run Backend" above)
+
+### CORS error in browser ("blocked by CORS policy")
+- Add `http://localhost` (no port) to `CORS_ORIGINS` in `.env`:
+  ```
+  CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
+  ```
+- Restart backend: `docker restart argus-backend`
+- For VPS: add your domain, e.g. `CORS_ORIGINS=http://localhost,https://argus.duckdns.org`
+
+### Frontend can't connect to backend
+- Verify backend is running: `curl http://localhost:8000/health`
+- Check CORS_ORIGINS includes the frontend origin (see above)
+- Check backend logs: `docker logs argus-backend`
 
 ### Discord alerts not firing
 - Check `DISCORD_WEBHOOK_URL` is set in `.env`
-- Restart backend after adding the URL: `docker compose restart backend`
-- Check logs: `docker compose logs -f backend`
+- Restart backend after adding the URL: `docker restart argus-backend`
+- Check logs: `docker logs argus-backend`
 
 ### Database not persisting
 - Check volume exists: `docker volume ls`
-- Verify volume is mounted: `docker compose exec backend ls /app/data`
+- Verify volume is mounted: `docker exec argus-backend ls /app/data`
 
 ### Container won't start
-- Check logs: `docker compose logs backend`
-- Verify `.env` is mounted correctly: `docker compose exec backend cat /app/.env`
+- Check logs: `docker logs argus-backend`
+- Verify `.env` is mounted correctly: `docker exec argus-backend cat /app/.env`
 - Ensure all required env vars are set (see Environment Variables table)

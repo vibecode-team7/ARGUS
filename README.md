@@ -316,4 +316,4 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 ---
 
-*Last updated: July 2025*
+*Last updated: July 2026*
