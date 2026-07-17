@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router";
 import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp, BookOpen, LogOut } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
 export default function Sidebar({ open, onClose }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -23,6 +25,38 @@ export default function Sidebar({ open, onClose }) {
 
   return (
     <>
+      {showLogoutConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setShowLogoutConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-bg-sidebar p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-text-primary">Log out?</h2>
+            <p className="mt-2 text-sm text-text-secondary">
+              You’ll need to sign in again to access your dashboard.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Mobile overlay */}
       {open && (
         <div
@@ -84,7 +118,8 @@ export default function Sidebar({ open, onClose }) {
             <ThemeToggle />
           </div>
           <button
-            onClick={handleLogout}
+            type="button"
+            onClick={() => setShowLogoutConfirm(true)}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium
               text-text-secondary hover:text-text-primary hover:bg-bg-secondary
               transition-colors cursor-pointer"
