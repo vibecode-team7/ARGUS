@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router";
-import { CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
 import { useFindings } from "../hooks/useFindings";
 import { useHosts } from "../hooks/useHosts";
 import FilterBar from "../components/FilterBar";
@@ -12,6 +12,11 @@ import ErrorState from "../components/ErrorState";
 import { formatTimestamp } from "../lib/format";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
+
+function escapeCsvValue(value) {
+  const stringValue = String(value ?? "");
+  return /[",\n]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue;
+}
 
 export default function FindingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -102,6 +107,37 @@ export default function FindingsPage() {
     });
   }, []);
 
+  const handleExportCsv = useCallback(() => {
+    const rows = sorted.map((finding) => ({
+      host: finding.scan.hostname,
+      finding: finding.name,
+      risk_level: finding.severity,
+      date: formatTimestamp(finding.detected_at),
+      status: finding.status === "detected" ? "Detected" : "Not detected",
+    }));
+
+    const headers = ["host", "finding", "risk_level", "date", "status"];
+    const csvLines = [headers.join(",")];
+
+    rows.forEach((row) => {
+      csvLines.push(
+        [row.host, row.finding, row.risk_level, row.date, row.status]
+          .map((value) => escapeCsvValue(value))
+          .join(",")
+      );
+    });
+
+    const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `argus-findings-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [sorted]);
+
   if (error) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
@@ -134,13 +170,22 @@ export default function FindingsPage() {
       />
 
       {/* Page size selector */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-text-secondary">
           {loading
             ? "Loading…"
             : `${allFindings.length} finding${allFindings.length !== 1 ? "s" : ""} from ${total} scan${total !== 1 ? "s" : ""}`}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={loading || sorted.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-bg-card px-3 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Download size={16} />
+            Export CSV
+          </button>
           <label htmlFor="page-size" className="text-xs text-text-muted">Scans per page:</label>
           <select
             id="page-size"
