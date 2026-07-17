@@ -413,4 +413,4 @@ sequenceDiagram
 
 ---
 
-*Last updated: July 2025*
+*Last updated: July 2026*
