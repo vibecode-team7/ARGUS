@@ -78,3 +78,13 @@ jobs:
         env:
           ARGUS_KEY_TEST: test_key_for_ci
         run: pytest backend/tests/ -q || true       # ch-8: drop `|| true` to enforce
+
+      # ---------- Docker Build Test (frontend) ----------
+      - name: Build Docker image (frontend)
+        if: ${{ hashFiles('frontend/Dockerfile') != '' }}
+        run: |
+          cd frontend
+          docker build \
+            --build-arg VITE_API_URL=https://argus-scanner.duckdns.org \
+            -t argus-frontend:ci-test \
+            .
