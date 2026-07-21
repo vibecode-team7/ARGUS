@@ -24,7 +24,7 @@ def _verify(x_api_key: str, required_role: str) -> int:
     if api_key is None:
         raise HTTPException(
             status_code=401,
-            detail=f"Invalid or inactive API key (requires role: {required_role})",
+            detail="Invalid API key",
         )
     return api_key.id
 

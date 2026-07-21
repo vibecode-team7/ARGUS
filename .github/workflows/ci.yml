@@ -88,3 +88,10 @@ jobs:
             --build-arg VITE_API_URL=https://argus-scanner.duckdns.org \
             -t argus-frontend:ci-test \
             .
+
+      # ---------- Docker Build Test (backend) ----------
+      - name: Build Docker image (backend)
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        run: |
+          cd backend
+          docker build -t argus-backend:ci-test .

@@ -2,13 +2,16 @@ import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
-from fastapi import FastAPI, Depends, Query, HTTPException
+from fastapi import FastAPI, Depends, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
 
@@ -17,6 +20,17 @@ from auth import verify_write_key, verify_read_key
 from alerting import send_high_risk_alert
 
 app = FastAPI(title="ARGUS Backend", version="0.1.0")
+
+# Rate limiting — reads X-Forwarded-For when behind Nginx proxy
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host
+
+limiter = Limiter(key_func=_get_client_ip, default_limits=["60/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CHANGED: CORS origins now read from env variable instead of wildcard "*"
 # In production (Docker with nginx proxy), CORS is never triggered.
@@ -37,39 +51,41 @@ init_db()
 # ── Pydantic models ──────────────────────────────────────────────────
 
 class FindingIn(BaseModel):
-    category: str
-    name: str
-    severity: str
-    status: str
-    evidence: str
+    category: Literal["local_llm", "ai_ide", "mcp_server"]
+    name: str = Field(max_length=128)
+    severity: Literal["high", "medium", "low"]
+    status: Literal["detected", "not_detected"]
+    evidence: str = Field(max_length=4096)
     pid: int | None = None
     port: int | None = None
-    path: str | None = None
-    user: str | None = None
+    path: str | None = Field(None, max_length=512)
+    user: str | None = Field(None, max_length=128)
     detected_at: datetime
 
 
 class ScanIn(BaseModel):
-    hostname: str
-    os: str
-    os_version: str
-    kernel: str | None = None
-    agent_version: str
+    hostname: str = Field(max_length=256)
+    os: str = Field(max_length=64)
+    os_version: str = Field(max_length=128)
+    kernel: str | None = Field(None, max_length=128)
+    agent_version: str = Field(max_length=32)
     scanned_at: datetime
     uptime_seconds: int | None = None
-    ip_address: str | None = None
-    findings: list[FindingIn]
+    ip_address: str | None = Field(None, max_length=64)
+    findings: list[FindingIn] = Field(max_length=50)
 
 
 # ── Routes ──────────────────────────────────────────────────────────
 
 @app.get("/health")
+@limiter.exempt
 def health():
     return {"status": "ok"}
 
 
 @app.post("/api/scan", status_code=201)
-def ingest_scan(payload: ScanIn, api_key_id: int = Depends(verify_write_key)):
+@limiter.limit("10/minute")
+def ingest_scan(request: Request, payload: ScanIn, api_key_id: int = Depends(verify_write_key)):
     now = datetime.now(timezone.utc)
 
     scan = Scan(
