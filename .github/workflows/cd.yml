@@ -21,19 +21,43 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  # ==========================================================================
+  # Detect what changed
+  # ==========================================================================
+
+  changes:
+    name: detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
   # ==========================================================================
   # Frontend
   # ==========================================================================
 
   frontend-build:
     name: build and push frontend image
+    if: |-
+      needs.changes.outputs.frontend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    concurrency:
-      group: cd-frontend
-      cancel-in-progress: true
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
@@ -65,7 +89,10 @@ jobs:
 
   frontend-deploy:
     name: deploy frontend to VPS
-    needs: frontend-build
+    if: |-
+      needs.changes.outputs.frontend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: [changes, frontend-build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -99,11 +126,12 @@ jobs:
 
   backend-build:
     name: build and push backend image
+    if: |-
+      needs.changes.outputs.backend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    concurrency:
-      group: cd-backend
-      cancel-in-progress: true
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
@@ -133,7 +161,10 @@ jobs:
 
   backend-deploy:
     name: deploy backend to VPS
-    needs: backend-build
+    if: |-
+      needs.changes.outputs.backend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: [changes, backend-build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
