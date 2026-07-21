@@ -20,7 +20,7 @@ export default function Sidebar({ open, onClose }) {
   const handleLogout = () => {
     logout();
     onClose?.();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   return (

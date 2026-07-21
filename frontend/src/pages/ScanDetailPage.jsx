@@ -6,6 +6,7 @@ import CategoryBadge from "../components/CategoryBadge";
 import { SkeletonCard, SkeletonText } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import SeoHead from "../components/SeoHead";
 import { formatTimestamp, formatUptime } from "../lib/format";
 function getOsIcon(os) {
   if (os === "darwin") return Laptop;
@@ -47,7 +48,9 @@ export default function ScanDetailPage() {
   const OsIcon = getOsIcon(scan.os);
 
   return (
-    <div className="space-y-6">
+    <>
+      <SeoHead title={`Scan #${scan.id}`} description={`Details from scan #${scan.id} on ${scan.hostname}.`} />
+      <div className="space-y-6">
       {/* Breadcrumb */}
       <Link
         to="/findings"
@@ -147,5 +150,6 @@ export default function ScanDetailPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

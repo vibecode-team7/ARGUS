@@ -12,6 +12,7 @@ import StatusDot from "../components/StatusDot";
 import { SkeletonCard, SkeletonTable } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import SeoHead from "../components/SeoHead";
 import { timeAgo, getAgentStatus } from "../lib/timeAgo";
 import { getSeverityColor } from "../lib/severity";
 
@@ -43,7 +44,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <SeoHead title="Dashboard" description="Overview of Shadow AI monitoring stats, recent hosts, and latest findings." />
+      <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {statsLoading ? (
@@ -152,5 +155,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

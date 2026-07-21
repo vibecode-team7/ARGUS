@@ -344,3 +344,43 @@ def trends(
     ]
 
     return {"days": days, "findings": findings_series, "new_hosts": hosts_series}
+
+
+# ── Delete endpoints (require write key) ──────────────────────────
+
+class DeleteScansIn(BaseModel):
+    scan_ids: list[int]
+
+
+class DeleteHostsIn(BaseModel):
+    hostnames: list[str]
+
+
+@app.delete("/api/scans")
+def delete_scans(payload: DeleteScansIn, _: int = Depends(verify_read_key)):
+    with get_session() as session:
+        deleted = (
+            session.execute(
+                select(Scan).where(Scan.id.in_(payload.scan_ids))
+            ).scalars().all()
+        )
+        count = len(deleted)
+        for scan in deleted:
+            session.delete(scan)
+        session.commit()
+    return {"deleted": count}
+
+
+@app.delete("/api/hosts")
+def delete_hosts(payload: DeleteHostsIn, _: int = Depends(verify_read_key)):
+    with get_session() as session:
+        deleted = (
+            session.execute(
+                select(Scan).where(Scan.hostname.in_(payload.hostnames))
+            ).scalars().all()
+        )
+        count = len(deleted)
+        for scan in deleted:
+            session.delete(scan)
+        session.commit()
+    return {"deleted": count}

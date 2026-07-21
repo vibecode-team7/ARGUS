@@ -15,6 +15,7 @@ import { TrendingUp } from "lucide-react";
 import { useTrends } from "../hooks/useTrends";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import SeoHead from "../components/SeoHead";
 import { formatDayLabel } from "../lib/format";
 
 const RANGE_OPTIONS = [
@@ -52,7 +53,9 @@ export default function TrendsPage() {
   if (error) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-6">
+    <>
+      <SeoHead title="Trends" description="View trends in Shadow AI detections and new host activity over time." />
+      <div className="space-y-6">
       {/* Date range filter */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-secondary">
@@ -177,5 +180,6 @@ export default function TrendsPage() {
         </>
       )}
     </div>
+    </>
   );
 }

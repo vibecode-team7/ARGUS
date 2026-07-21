@@ -161,7 +161,7 @@ export default function Header({ onMenuClick }) {
             transition-colors ${
               open
                 ? "bg-bg-input border-accent ring-1 ring-accent"
-                : "bg-bg-secondary border-border text-text-muted hover:border-border-hover"
+                : "bg-bg-input border-border text-text-muted hover:border-border-hover"
             }`}
         >
           <Search size={14} />
@@ -177,7 +177,7 @@ export default function Header({ onMenuClick }) {
             onFocus={() => query.trim() && setOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder="Search hosts…"
-            className="bg-transparent outline-none text-text-primary placeholder:text-text-muted w-48"
+            className="bg-transparent outline-none focus-visible:outline-none focus:outline-none focus:ring-0 text-text-primary placeholder:text-text-muted w-48"
             aria-label="Search hosts by name, OS, or IP"
             aria-expanded={open && matches.length > 0}
             aria-controls="search-results"

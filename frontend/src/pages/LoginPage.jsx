@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { Shield, KeyRound, Loader2 } from "lucide-react";
+import SeoHead from "../components/SeoHead";
 import { useAuth } from "../context/AuthContext";
 import { verifyApiKey } from "../lib/api";
 
@@ -37,7 +38,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-primary px-4">
+    <>
+      <SeoHead title="Sign In" description="Sign in to the ARGUS dashboard." noIndex />
+      <div className="min-h-screen flex items-center justify-center bg-bg-primary px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-accent mb-3">
@@ -90,5 +93,6 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+    </>
   );
 }

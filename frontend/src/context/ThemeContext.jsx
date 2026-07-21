@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 const ThemeContext = createContext(undefined);
 
@@ -31,6 +31,23 @@ function resolveSystemTheme() {
   return "light";
 }
 
+/**
+ * Apply the .dark class on <html> without triggering layout transitions
+ * by temporarily disabling them via a utility class.
+ */
+function applyTheme(isDark) {
+  const html = document.documentElement;
+  // Disable transitions during theme switch to prevent jank
+  html.classList.add("disable-transitions");
+  html.classList.toggle("dark", isDark);
+  // Re-enable transitions on the next frame
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      html.classList.remove("disable-transitions");
+    });
+  });
+}
+
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(getStoredTheme);
   const [resolved, setResolved] = useState(() =>
@@ -39,22 +56,23 @@ export function ThemeProvider({ children }) {
 
   // Apply .dark class on <html> and resolve system mode
   useEffect(() => {
-    const html = document.documentElement;
-
     if (mode === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       const handler = (e) => {
         const next = e.matches ? "dark" : "light";
         setResolved(next);
-        html.classList.toggle("dark", next === "dark");
+        applyTheme(next === "dark");
       };
-      handler(mq);
+      // Apply current system preference
+      const current = mq.matches ? "dark" : "light";
+      setResolved(current);
+      applyTheme(current === "dark");
       mq.addEventListener("change", handler);
       return () => mq.removeEventListener("change", handler);
     }
 
     setResolved(mode);
-    html.classList.toggle("dark", mode === "dark");
+    applyTheme(mode === "dark");
   }, [mode]);
 
   // Persist to localStorage
@@ -66,13 +84,13 @@ export function ThemeProvider({ children }) {
     }
   }, [mode]);
 
-  const cycleTheme = () => {
+  const cycleTheme = useCallback(() => {
     setMode((prev) => {
       if (prev === "system") return "light";
       if (prev === "light") return "dark";
       return "system";
     });
-  };
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ mode, resolved, cycleTheme }}>

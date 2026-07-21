@@ -27,7 +27,7 @@ function FilterBar({ hostname, severity, hostnames = [], onHostnameChange, onSev
           onChange={(e) => onHostnameChange(e.target.value)}
           className="px-3 py-1.5 rounded-lg text-sm
             bg-bg-input border border-border text-text-primary
-            hover:border-border-hover focus:border-accent focus:outline-none
+            hover:border-border-hover focus:border-accent focus:outline-none focus-visible:outline-none
             transition-colors cursor-pointer"
         >
           <option value="">All hosts</option>
@@ -48,7 +48,7 @@ function FilterBar({ hostname, severity, hostnames = [], onHostnameChange, onSev
           onChange={(e) => onSeverityChange(e.target.value)}
           className="px-3 py-1.5 rounded-lg text-sm
             bg-bg-input border border-border text-text-primary
-            hover:border-border-hover focus:border-accent focus:outline-none
+            hover:border-border-hover focus:border-accent focus:outline-none focus-visible:outline-none
             transition-colors cursor-pointer"
         >
           <option value="">All severities</option>

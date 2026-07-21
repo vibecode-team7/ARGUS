@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Shield, BookOpen } from "lucide-react";
 import PublicHeader from "../components/layout/PublicHeader";
 import GuideCard from "../components/GuideCard";
+import SeoHead from "../components/SeoHead";
 import guides from "../lib/guides";
 
 const TAGS = ["all", "client", "admin"];
@@ -18,7 +19,9 @@ export default function GuidePage() {
   );
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <>
+      <SeoHead title="Guides" description="Deploy, configure, and use the ARGUS Shadow AI Scanner — for end users and administrators." />
+      <div className="min-h-screen bg-bg-primary">
       <PublicHeader />
 
       {/* Hero */}
@@ -68,5 +71,6 @@ export default function GuidePage() {
         )}
       </div>
     </div>
+    </>
   );
 }

@@ -94,12 +94,19 @@ export function clearStoredApiKey() {
 
 /**
  * Core fetch wrapper. Attaches API key, parses JSON, throws on error.
+ * Supports GET (default) and DELETE with an optional JSON body.
  */
-async function request(path, { signal } = {}) {
+async function request(path, { method, body, signal } = {}) {
+  const headers = {
+    "X-API-Key": getApiKey(),
+  };
+  if (body) {
+    headers["Content-Type"] = "application/json";
+  }
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      "X-API-Key": getApiKey(),
-    },
+    method: method ?? "GET",
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
     signal,
   });
@@ -204,4 +211,32 @@ export function fetchTrends({ days = 30, signal } = {}) {
   const params = new URLSearchParams();
   params.set("days", String(days));
   return request(`/api/trends?${params}`, { signal });
+}
+
+/**
+ * DELETE /api/scans
+ * @param {number[]} scanIds
+ * @param {{ signal?: AbortSignal }} opts
+ * @returns {Promise<{deleted: number}>}
+ */
+export function deleteScans(scanIds, { signal } = {}) {
+  return request("/api/scans", {
+    method: "DELETE",
+    body: { scan_ids: scanIds },
+    signal,
+  });
+}
+
+/**
+ * DELETE /api/hosts
+ * @param {string[]} hostnames
+ * @param {{ signal?: AbortSignal }} opts
+ * @returns {Promise<{deleted: number}>}
+ */
+export function deleteHosts(hostnames, { signal } = {}) {
+  return request("/api/hosts", {
+    method: "DELETE",
+    body: { hostnames },
+    signal,
+  });
 }
