@@ -41,7 +41,7 @@ def seed():
                 print(f"  SKIP  {name:20s} (already exists)")
                 continue
             session.add(ApiKey(key_hash=key_hash, name=name, role=role))
-            print(f"  ADD   {name:20s} → {plaintext:30s} [{role}]")
+            print(f"  ADD   {name:20s} [{role}]")
         session.commit()
 
     print("\nDone. Keys have been hashed and stored.")
