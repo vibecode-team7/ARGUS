@@ -53,11 +53,11 @@ export default function DashboardPage() {
           Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
         ) : (
           <>
-            <StatCard icon={Server} label="Total Hosts" value={stats?.total_hosts} />
-            <StatCard icon={FileWarning} label="Total Findings" value={stats?.total_findings} />
-            <StatCard icon={AlertTriangle} label="High Risk" value={stats?.high_risk} accent="red" />
-            <StatCard icon={AlertCircle} label="Medium Risk" value={stats?.medium_risk} accent="amber" />
-            <StatCard icon={Info} label="Low Risk" value={stats?.low_risk} accent="green" />
+            <StatCard icon={Server} label="Total Hosts" value={stats?.total_hosts} to="/hosts" />
+            <StatCard icon={FileWarning} label="Total Findings" value={stats?.total_findings} to="/findings" />
+            <StatCard icon={AlertTriangle} label="High Risk" value={stats?.high_risk} accent="red" to="/findings?severity=high" />
+            <StatCard icon={AlertCircle} label="Medium Risk" value={stats?.medium_risk} accent="amber" to="/findings?severity=medium" />
+            <StatCard icon={Info} label="Low Risk" value={stats?.low_risk} accent="green" to="/findings?severity=low" />
           </>
         )}
       </div>

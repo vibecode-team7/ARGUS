@@ -275,7 +275,7 @@ export default function FindingsPage() {
             onChange={(e) => handleLimitChange(Number(e.target.value))}
             className="px-2 py-1 rounded-lg text-xs
               bg-bg-input border border-border text-text-primary
-              hover:border-border-hover focus:border-accent focus:outline-none focus-visible:outline-none
+              hover:border-border-hover focus:border-border-hover focus:outline-none focus-visible:outline-none
               transition-colors cursor-pointer"
           >
             {PAGE_SIZE_OPTIONS.map((n) => (

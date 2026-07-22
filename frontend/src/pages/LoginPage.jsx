@@ -58,7 +58,7 @@ export default function LoginPage() {
             <label htmlFor="api-key" className="text-sm font-medium text-text-primary">
               Dashboard API key
             </label>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-bg-input focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-colors">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-bg-input focus-within:border-border-hover transition-colors">
               <KeyRound size={16} className="text-text-muted shrink-0" />
               <input
                 id="api-key"

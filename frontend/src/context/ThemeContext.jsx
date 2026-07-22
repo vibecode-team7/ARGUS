@@ -4,29 +4,14 @@ const ThemeContext = createContext(undefined);
 
 const STORAGE_KEY = "argus-theme";
 
-/**
- * @returns {"system" | "light" | "dark"}
- */
 function getStoredTheme() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark" || stored === "system") {
+    if (stored === "light" || stored === "dark") {
       return stored;
     }
   } catch {
     /* localStorage unavailable */
-  }
-  return "system";
-}
-
-/**
- * Resolve "system" to an actual "light" or "dark" based on OS preference.
- */
-function resolveSystemTheme() {
-  if (typeof window !== "undefined" && window.matchMedia) {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
   }
   return "light";
 }
@@ -37,10 +22,8 @@ function resolveSystemTheme() {
  */
 function applyTheme(isDark) {
   const html = document.documentElement;
-  // Disable transitions during theme switch to prevent jank
   html.classList.add("disable-transitions");
   html.classList.toggle("dark", isDark);
-  // Re-enable transitions on the next frame
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       html.classList.remove("disable-transitions");
@@ -50,28 +33,9 @@ function applyTheme(isDark) {
 
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(getStoredTheme);
-  const [resolved, setResolved] = useState(() =>
-    mode === "system" ? resolveSystemTheme() : mode
-  );
 
-  // Apply .dark class on <html> and resolve system mode
+  // Apply .dark class on <html>
   useEffect(() => {
-    if (mode === "system") {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = (e) => {
-        const next = e.matches ? "dark" : "light";
-        setResolved(next);
-        applyTheme(next === "dark");
-      };
-      // Apply current system preference
-      const current = mq.matches ? "dark" : "light";
-      setResolved(current);
-      applyTheme(current === "dark");
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    }
-
-    setResolved(mode);
     applyTheme(mode === "dark");
   }, [mode]);
 
@@ -85,15 +49,11 @@ export function ThemeProvider({ children }) {
   }, [mode]);
 
   const cycleTheme = useCallback(() => {
-    setMode((prev) => {
-      if (prev === "system") return "light";
-      if (prev === "light") return "dark";
-      return "system";
-    });
+    setMode((prev) => (prev === "light" ? "dark" : "light"));
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ mode, resolved, cycleTheme }}>
+    <ThemeContext.Provider value={{ mode, cycleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
