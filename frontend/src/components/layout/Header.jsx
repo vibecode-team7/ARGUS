@@ -177,7 +177,7 @@ export default function Header({ onMenuClick }) {
             onFocus={() => query.trim() && setOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder="Search hosts…"
-            className="bg-transparent outline-none focus-visible:outline-none focus:outline-none focus:ring-0 text-text-primary placeholder:text-text-muted w-48"
+            className="bg-transparent outline-none focus-visible:outline-none focus:outline-none focus:ring-0 text-text-primary placeholder:text-text-muted w-44 lg:w-56"
             aria-label="Search hosts by name, OS, or IP"
             aria-expanded={open && matches.length > 0}
             aria-controls="search-results"

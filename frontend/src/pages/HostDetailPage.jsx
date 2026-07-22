@@ -128,14 +128,14 @@ export default function HostDetailPage() {
                 </span>
               )}
             </h3>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-bg-input text-sm transition-colors focus-within:border-accent focus-within:shadow-[0_0_0_2px_rgba(99,102,241,0.2)]">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-bg-input text-sm transition-colors focus-within:border-accent focus-within:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] w-full sm:w-auto">
               <Search size={14} className="text-text-muted shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search findings by name, category, or evidence…"
-                className="bg-transparent outline-none focus-visible:outline-none focus:outline-none focus:ring-0 text-text-primary placeholder:text-text-muted w-48 sm:w-64"
+                className="bg-transparent outline-none focus-visible:outline-none focus:outline-none focus:ring-0 text-text-primary placeholder:text-text-muted w-full sm:w-48 lg:w-64"
                 aria-label="Search findings in host scans"
               />
               {searchQuery && (

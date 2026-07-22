@@ -17,7 +17,7 @@ function Pagination({ page, totalPages, total, limit, onPageChange }) {
   if (total === 0) return null;
 
   return (
-    <nav aria-label="Pagination" className="flex items-center justify-between text-sm text-text-secondary">
+    <nav aria-label="Pagination" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-text-secondary">
       <p>
         Showing <span className="font-medium text-text-primary">{start}–{end}</span> of{" "}
         <span className="font-medium text-text-primary">{total}</span>

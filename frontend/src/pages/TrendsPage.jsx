@@ -57,11 +57,11 @@ export default function TrendsPage() {
       <SeoHead title="Trends" description="View trends in Shadow AI detections and new host activity over time." />
       <div className="space-y-6">
       {/* Date range filter */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-text-secondary">
           {loading ? "Loading…" : `Last ${days} days`}
         </p>
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-secondary border border-border">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-secondary border border-border w-fit">
           {RANGE_OPTIONS.map((opt) => (
             <button
               key={opt.value}

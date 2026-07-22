@@ -166,14 +166,14 @@ export default function HostsPage() {
       <div className="space-y-4">
       {/* Search bar */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-bg-input text-sm transition-colors focus-within:border-accent focus-within:shadow-[0_0_0_2px_rgba(99,102,241,0.2)]">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-bg-input text-sm transition-colors focus-within:border-accent focus-within:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] w-full sm:w-auto">
           <Search size={14} className="text-text-muted shrink-0" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search hosts by name, OS, or IP…"
-            className="bg-transparent outline-none focus-visible:outline-none text-text-primary placeholder:text-text-muted w-48"
+            className="bg-transparent outline-none focus-visible:outline-none text-text-primary placeholder:text-text-muted w-full sm:w-48"
             aria-label="Search hosts"
           />
           {searchQuery && (

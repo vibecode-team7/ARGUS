@@ -9,7 +9,7 @@ import SeverityBar from "../components/SeverityBar";
 import SeverityBadge from "../components/SeverityBadge";
 import CategoryBadge from "../components/CategoryBadge";
 import StatusDot from "../components/StatusDot";
-import { SkeletonCard, SkeletonTable } from "../components/Skeleton";
+import { SkeletonCard, SkeletonTable, SkeletonBar } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
 import SeoHead from "../components/SeoHead";
@@ -63,7 +63,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Severity Bar */}
-      {!statsLoading && stats && (
+      {statsLoading ? (
+        <div className="p-5 rounded-xl bg-bg-card border border-border">
+          <div className="skeleton h-4 w-36 mb-4" />
+          <SkeletonBar rows={3} />
+        </div>
+      ) : stats && (
         <div className="p-5 rounded-xl bg-bg-card border border-border">
           <h3 className="text-sm font-semibold text-text-primary mb-3">Severity Distribution</h3>
           <SeverityBar high={stats.high_risk} medium={stats.medium_risk} low={stats.low_risk} />

@@ -27,6 +27,24 @@ export default function ScanDetailPage() {
         <div className="p-5 rounded-xl bg-bg-card border border-border space-y-3">
           <SkeletonText width="w-48" />
           <SkeletonText width="w-64" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border">
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-28" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-24" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-20" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-28" />
+            </div>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SkeletonCard />
