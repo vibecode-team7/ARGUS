@@ -4,6 +4,8 @@ React + Vite frontend for the ARGUS Shadow AI Scanner. Talks to the
 FastAPI backend (`../backend/`) over `GET /api/*`, authenticated with
 the dashboard's read-role API key.
 
+![Screenshot](screenshot.png)
+
 ## Local development
 
 ```bash
