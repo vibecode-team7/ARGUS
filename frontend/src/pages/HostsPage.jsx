@@ -164,6 +164,7 @@ export default function HostsPage() {
     <>
       <SeoHead title="Hosts" description="Monitor all scanned endpoints and their Shadow AI risk levels." />
       <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-text-primary mb-1">Hosts</h1>
       {/* Search bar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-bg-input text-sm transition-colors focus-within:border-border-hover w-full sm:w-auto">

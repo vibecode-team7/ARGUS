@@ -56,6 +56,7 @@ export default function TrendsPage() {
     <>
       <SeoHead title="Trends" description="View trends in Shadow AI detections and new host activity over time." />
       <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-text-primary mb-1">Trends</h1>
       {/* Date range filter */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-text-secondary">
@@ -94,7 +95,7 @@ export default function TrendsPage() {
         <>
           {/* Findings by severity */}
           <div className="p-5 rounded-xl bg-bg-card border border-border">
-            <h3 className="text-sm font-semibold text-text-primary mb-1">Findings Over Time</h3>
+            <h2 className="text-sm font-semibold text-text-primary mb-1">Findings Over Time</h2>
             <p className="text-xs text-text-muted mb-4">Detected findings by severity, per day</p>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -152,7 +153,7 @@ export default function TrendsPage() {
 
           {/* New hosts */}
           <div className="p-5 rounded-xl bg-bg-card border border-border">
-            <h3 className="text-sm font-semibold text-text-primary mb-1">New Hosts Over Time</h3>
+            <h2 className="text-sm font-semibold text-text-primary mb-1">New Hosts Over Time</h2>
             <p className="text-xs text-text-muted mb-4">First-seen agent check-ins, per day</p>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">

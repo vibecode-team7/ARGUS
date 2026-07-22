@@ -10,7 +10,7 @@ export default function NotFoundPage() {
         <div className="flex items-center justify-center w-20 h-20 rounded-full bg-bg-secondary mb-6">
           <ShieldOff size={40} className="text-text-muted" />
         </div>
-        <h2 className="text-2xl font-bold text-text-primary mb-2">404 — Page Not Found</h2>
+        <h1 className="text-2xl font-bold text-text-primary mb-2">404 — Page Not Found</h1>
         <p className="text-text-secondary mb-6 max-w-md">
           The page you are looking for does not exist or has been moved.
         </p>

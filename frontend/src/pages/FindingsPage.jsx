@@ -230,6 +230,7 @@ export default function FindingsPage() {
     <>
       <SeoHead title="Findings" description="Browse and filter detected Shadow AI tools across all endpoints." />
       <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-text-primary mb-1">Findings</h1>
       {/* Filter Bar */}
       <FilterBar
         hostname={hostnameFilter}

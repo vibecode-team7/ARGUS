@@ -83,10 +83,10 @@ export default function ScanDetailPage() {
         <div className="flex flex-wrap items-start gap-4">
           <OsIcon size={32} className="text-text-muted mt-1" />
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-text-primary mb-1">
+            <h1 className="text-xl font-bold text-text-primary mb-1">
               Scan #{scan.id}
               <span className="ml-3 text-base font-normal text-text-secondary">{scan.hostname}</span>
-            </h2>
+            </h1>
             <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-bg-secondary text-xs font-medium">
                 {scan.os} {scan.os_version}

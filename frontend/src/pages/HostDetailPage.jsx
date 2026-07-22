@@ -86,7 +86,7 @@ export default function HostDetailPage() {
               return <OsIcon size={32} className="text-text-muted mt-1" />;
             })()}
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold text-text-primary mb-1">{decodedHostname}</h2>
+              <h1 className="text-xl font-bold text-text-primary mb-1">{decodedHostname}</h1>
               <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-bg-secondary text-xs font-medium">
                   {hostInfo.os} {hostInfo.os_version}
@@ -120,14 +120,14 @@ export default function HostDetailPage() {
         <div className="space-y-3">
           {/* Search + title */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-sm font-semibold text-text-primary">
+            <h2 className="text-sm font-semibold text-text-primary">
               Scan History ({scans.length})
               {searchQuery && (
                 <span className="ml-2 font-normal text-text-muted">
                   · {totalFindings} finding{totalFindings !== 1 ? "s" : ""} match
                 </span>
               )}
-            </h3>
+            </h2>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-bg-input text-sm transition-colors focus-within:border-border-hover w-full sm:w-auto">
               <Search size={14} className="text-text-muted shrink-0" />
               <input
