@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router";
-import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp, BookOpen, LogOut } from "lucide-react";
+import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp, LogOut } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
 import { useAuth } from "../../context/AuthContext";
 
@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { to: "/hosts", icon: Server, label: "Hosts" },
   { to: "/findings", icon: FileWarning, label: "Findings" },
   { to: "/trends", icon: TrendingUp, label: "Trends" },
-  { to: "/guide", icon: BookOpen, label: "Guides" },
 ];
 
 export default function Sidebar({ open, onClose }) {

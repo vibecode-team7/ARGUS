@@ -9,7 +9,6 @@ const PAGE_TITLES = {
   "/hosts": "Hosts",
   "/findings": "Findings",
   "/trends": "Trends",
-  "/guide": "Guides",
 };
 
 export default function Header({ onMenuClick }) {
