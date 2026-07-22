@@ -1,3 +1,4 @@
+import json
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -6,17 +7,41 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
-from fastapi import FastAPI, Depends, Query, HTTPException
+from fastapi import FastAPI, Depends, Query, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 
 from database import init_db, get_session, Scan, Finding
 from auth import verify_write_key, verify_read_key
 from alerting import send_high_risk_alert
 
 app = FastAPI(title="ARGUS Backend", version="0.1.0")
+
+
+# ── Exception handlers ─────────────────────────────────────────────
+
+@app.exception_handler(RequestValidationError)
+async def validation_to_400(request: Request, exc: RequestValidationError):
+    """Return 400 instead of FastAPI's default 422 for validation errors."""
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Invalid request body. Check required fields and types."},
+    )
+
+
+@app.exception_handler(json.JSONDecodeError)
+async def json_decode_to_400(request: Request, exc: json.JSONDecodeError):
+    """Return 400 when the request body is not valid JSON."""
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Malformed JSON in request body."},
+    )
+
 
 # CHANGED: CORS origins now read from env variable instead of wildcard "*"
 # In production (Docker with nginx proxy), CORS is never triggered.
@@ -72,41 +97,77 @@ def health():
 def ingest_scan(payload: ScanIn, api_key_id: int = Depends(verify_write_key)):
     now = datetime.now(timezone.utc)
 
-    scan = Scan(
-        hostname=payload.hostname,
-        os=payload.os,
-        os_version=payload.os_version,
-        kernel=payload.kernel,
-        agent_version=payload.agent_version,
-        scanned_at=payload.scanned_at,
-        uptime_seconds=payload.uptime_seconds,
-        ip_address=payload.ip_address,
-        api_key_id=api_key_id,
-        received_at=now,
-    )
-
     with get_session() as session:
-        session.add(scan)
-        session.flush()
-
-        for f in payload.findings:
-            finding = Finding(
-                scan_id=scan.id,
-                category=f.category,
-                name=f.name,
-                severity=f.severity,
-                status=f.status,
-                evidence=f.evidence,
-                pid=f.pid,
-                port=f.port,
-                path=f.path,
-                user=f.user,
-                detected_at=f.detected_at,
+        # Idempotency check: same hostname + scanned_at = duplicate
+        existing = session.execute(
+            select(Scan).where(
+                Scan.hostname == payload.hostname,
+                Scan.scanned_at == payload.scanned_at,
             )
-            session.add(finding)
+        ).scalar_one_or_none()
 
-        session.commit()
-        session.refresh(scan)
+        if existing is not None:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "Duplicate scan. A scan for this host at this time already exists.",
+                    "existing_scan_id": existing.id,
+                },
+            )
+
+        scan = Scan(
+            hostname=payload.hostname,
+            os=payload.os,
+            os_version=payload.os_version,
+            kernel=payload.kernel,
+            agent_version=payload.agent_version,
+            scanned_at=payload.scanned_at,
+            uptime_seconds=payload.uptime_seconds,
+            ip_address=payload.ip_address,
+            api_key_id=api_key_id,
+            received_at=now,
+        )
+
+        try:
+            session.add(scan)
+            session.flush()
+
+            for f in payload.findings:
+                finding = Finding(
+                    scan_id=scan.id,
+                    category=f.category,
+                    name=f.name,
+                    severity=f.severity,
+                    status=f.status,
+                    evidence=f.evidence,
+                    pid=f.pid,
+                    port=f.port,
+                    path=f.path,
+                    user=f.user,
+                    detected_at=f.detected_at,
+                )
+                session.add(finding)
+
+            session.commit()
+            session.refresh(scan)
+        except IntegrityError:
+            session.rollback()
+            # Race condition: another submission won before our SELECT
+            existing = session.execute(
+                select(Scan).where(
+                    Scan.hostname == payload.hostname,
+                    Scan.scanned_at == payload.scanned_at,
+                )
+            ).scalar_one_or_none()
+            if existing is not None:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "detail": "Duplicate scan (race condition).",
+                        "existing_scan_id": existing.id,
+                    },
+                )
+            raise
 
     detected_findings = [
         {"name": f.name, "category": f.category, "severity": f.severity, "evidence": f.evidence}
