@@ -160,7 +160,7 @@ export default function Header({ onMenuClick }) {
           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm
             transition-colors ${
               open
-                ? "bg-bg-input border-accent ring-1 ring-accent"
+                ? "bg-bg-input border-accent shadow-[0_0_0_2px_rgba(99,102,241,0.2)]"
                 : "bg-bg-input border-border text-text-muted hover:border-border-hover"
             }`}
         >
