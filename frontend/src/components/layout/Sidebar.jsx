@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useNavigate } from "react-router";
+import { NavLink } from "react-router";
 import { LayoutDashboard, Server, FileWarning, Shield, TrendingUp, LogOut } from "lucide-react";
 import ThemeToggle from "../ThemeToggle";
 import { useAuth } from "../../context/AuthContext";
@@ -13,13 +13,15 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ open, onClose }) {
   const { logout } = useAuth();
-  const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
     logout();
     onClose?.();
-    navigate("/", { replace: true });
+    // Use window.location to force a full page navigation to the index page,
+    // bypassing the RequireAuth guard that would otherwise redirect to /login
+    // when isAuthenticated becomes false and the Sidebar unmounts.
+    window.location.href = "/";
   };
 
   return (
