@@ -1,0 +1,198 @@
+name: cd
+
+# Continuous Deployment for frontend + backend — builds Docker images, pushes to
+# Docker Hub, and deploys to VPS when relevant files change on main.
+#
+# Required GitHub Secrets:
+#   DOCKERHUB_USERNAME  — Docker Hub username (kpzik)
+#   DOCKERHUB_TOKEN     — Docker Hub access token (not password)
+#   VPS_SSH_KEY         — SSH private key for VPS
+#   VPS_HOST            — VPS IP address
+#   VPS_USER            — SSH username (e.g., root)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - ".github/workflows/cd.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ==========================================================================
+  # Detect what changed
+  # ==========================================================================
+
+  changes:
+    name: detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
+  # ==========================================================================
+  # Frontend
+  # ==========================================================================
+
+  frontend-build:
+    name: build and push frontend image
+    if: |-
+      needs.changes.outputs.frontend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: frontend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/argus-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/argus-frontend:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=https://argus-scanner.duckdns.org
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  frontend-deploy:
+    name: deploy frontend to VPS
+    if: |-
+      needs.changes.outputs.frontend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: [changes, frontend-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "=== Pulling latest frontend image ==="
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/argus-frontend:latest
+
+            echo "=== Stopping old container ==="
+            docker stop argus-frontend || true
+            docker rm argus-frontend || true
+
+            echo "=== Starting new container ==="
+            docker run -d \
+              --name argus-frontend \
+              --network argus_net \
+              --restart unless-stopped \
+              ${{ secrets.DOCKERHUB_USERNAME }}/argus-frontend:latest
+
+            echo "=== Frontend deployment complete ==="
+            docker ps --filter name=argus-frontend
+
+  # ==========================================================================
+  # Backend
+  # ==========================================================================
+
+  backend-build:
+    name: build and push backend image
+    if: |-
+      needs.changes.outputs.backend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: backend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/argus-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/argus-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  backend-deploy:
+    name: deploy backend to VPS
+    if: |-
+      needs.changes.outputs.backend == 'true'
+      || github.event_name == 'workflow_dispatch'
+    needs: [changes, backend-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "=== Pulling latest backend image ==="
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/argus-backend:latest
+
+            echo "=== Stopping old container ==="
+            docker stop argus-backend || true
+            docker rm argus-backend || true
+
+            echo "=== Starting new container ==="
+            docker run -d \
+              --name argus-backend \
+              --network argus_net \
+              -v argus-data:/app/data \
+              -v ~/argus-config/.env:/app/.env:ro \
+              --restart unless-stopped \
+              ${{ secrets.DOCKERHUB_USERNAME }}/argus-backend:latest
+
+            echo "=== Running seed (idempotent) ==="
+            docker exec argus-backend python seed.py
+
+            echo "=== Backend deployment complete ==="
+            docker ps --filter name=argus-backend

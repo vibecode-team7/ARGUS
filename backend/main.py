@@ -1,20 +1,19 @@
-import json
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 from fastapi import FastAPI, Depends, Query, HTTPException, Request
-from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
-from sqlalchemy.exc import IntegrityError
 
 from database import init_db, get_session, Scan, Finding
 from auth import verify_write_key, verify_read_key
@@ -22,26 +21,16 @@ from alerting import send_high_risk_alert
 
 app = FastAPI(title="ARGUS Backend", version="0.1.0")
 
+# Rate limiting — reads X-Forwarded-For when behind Nginx proxy
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host
 
-# ── Exception handlers ─────────────────────────────────────────────
-
-@app.exception_handler(RequestValidationError)
-async def validation_to_400(request: Request, exc: RequestValidationError):
-    """Return 400 instead of FastAPI's default 422 for validation errors."""
-    return JSONResponse(
-        status_code=400,
-        content={"detail": "Invalid request body. Check required fields and types."},
-    )
-
-
-@app.exception_handler(json.JSONDecodeError)
-async def json_decode_to_400(request: Request, exc: json.JSONDecodeError):
-    """Return 400 when the request body is not valid JSON."""
-    return JSONResponse(
-        status_code=400,
-        content={"detail": "Malformed JSON in request body."},
-    )
-
+limiter = Limiter(key_func=_get_client_ip, default_limits=["60/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CHANGED: CORS origins now read from env variable instead of wildcard "*"
 # In production (Docker with nginx proxy), CORS is never triggered.
@@ -62,112 +51,78 @@ init_db()
 # ── Pydantic models ──────────────────────────────────────────────────
 
 class FindingIn(BaseModel):
-    category: str
-    name: str
-    severity: str
-    status: str
-    evidence: str
+    category: Literal["local_llm", "ai_ide", "mcp_server"]
+    name: str = Field(max_length=128)
+    severity: Literal["high", "medium", "low"]
+    status: Literal["detected", "not_detected"]
+    evidence: str = Field(max_length=4096)
     pid: int | None = None
     port: int | None = None
-    path: str | None = None
-    user: str | None = None
+    path: str | None = Field(None, max_length=512)
+    user: str | None = Field(None, max_length=128)
     detected_at: datetime
 
 
 class ScanIn(BaseModel):
-    hostname: str
-    os: str
-    os_version: str
-    kernel: str | None = None
-    agent_version: str
+    hostname: str = Field(max_length=256)
+    os: str = Field(max_length=64)
+    os_version: str = Field(max_length=128)
+    kernel: str | None = Field(None, max_length=128)
+    agent_version: str = Field(max_length=32)
     scanned_at: datetime
     uptime_seconds: int | None = None
-    ip_address: str | None = None
-    findings: list[FindingIn]
+    ip_address: str | None = Field(None, max_length=64)
+    findings: list[FindingIn] = Field(max_length=50)
 
 
 # ── Routes ──────────────────────────────────────────────────────────
 
 @app.get("/health")
+@limiter.exempt
 def health():
     return {"status": "ok"}
 
 
 @app.post("/api/scan", status_code=201)
-def ingest_scan(payload: ScanIn, api_key_id: int = Depends(verify_write_key)):
+@limiter.limit("10/minute")
+def ingest_scan(request: Request, payload: ScanIn, api_key_id: int = Depends(verify_write_key)):
     now = datetime.now(timezone.utc)
 
+    scan = Scan(
+        hostname=payload.hostname,
+        os=payload.os,
+        os_version=payload.os_version,
+        kernel=payload.kernel,
+        agent_version=payload.agent_version,
+        scanned_at=payload.scanned_at,
+        uptime_seconds=payload.uptime_seconds,
+        ip_address=payload.ip_address,
+        api_key_id=api_key_id,
+        received_at=now,
+    )
+
     with get_session() as session:
-        # Idempotency check: same hostname + scanned_at = duplicate
-        existing = session.execute(
-            select(Scan).where(
-                Scan.hostname == payload.hostname,
-                Scan.scanned_at == payload.scanned_at,
+        session.add(scan)
+        session.flush()
+
+        for f in payload.findings:
+            finding = Finding(
+                scan_id=scan.id,
+                category=f.category,
+                name=f.name,
+                severity=f.severity,
+                status=f.status,
+                evidence=f.evidence,
+                pid=f.pid,
+                port=f.port,
+                path=f.path,
+                user=f.user,
+                detected_at=f.detected_at,
             )
-        ).scalar_one_or_none()
+            session.add(finding)
 
-        if existing is not None:
-            return JSONResponse(
-                status_code=409,
-                content={
-                    "detail": "Duplicate scan. A scan for this host at this time already exists.",
-                    "existing_scan_id": existing.id,
-                },
-            )
-
-        scan = Scan(
-            hostname=payload.hostname,
-            os=payload.os,
-            os_version=payload.os_version,
-            kernel=payload.kernel,
-            agent_version=payload.agent_version,
-            scanned_at=payload.scanned_at,
-            uptime_seconds=payload.uptime_seconds,
-            ip_address=payload.ip_address,
-            api_key_id=api_key_id,
-            received_at=now,
-        )
-
-        try:
-            session.add(scan)
-            session.flush()
-
-            for f in payload.findings:
-                finding = Finding(
-                    scan_id=scan.id,
-                    category=f.category,
-                    name=f.name,
-                    severity=f.severity,
-                    status=f.status,
-                    evidence=f.evidence,
-                    pid=f.pid,
-                    port=f.port,
-                    path=f.path,
-                    user=f.user,
-                    detected_at=f.detected_at,
-                )
-                session.add(finding)
-
-            session.commit()
-            session.refresh(scan)
-        except IntegrityError:
-            session.rollback()
-            # Race condition: another submission won before our SELECT
-            existing = session.execute(
-                select(Scan).where(
-                    Scan.hostname == payload.hostname,
-                    Scan.scanned_at == payload.scanned_at,
-                )
-            ).scalar_one_or_none()
-            if existing is not None:
-                return JSONResponse(
-                    status_code=409,
-                    content={
-                        "detail": "Duplicate scan (race condition).",
-                        "existing_scan_id": existing.id,
-                    },
-                )
-            raise
+        session.commit()
+        session.refresh(scan)
 
     detected_findings = [
         {"name": f.name, "category": f.category, "severity": f.severity, "evidence": f.evidence}
@@ -405,43 +360,3 @@ def trends(
     ]
 
     return {"days": days, "findings": findings_series, "new_hosts": hosts_series}
-
-
-# ── Delete endpoints (require write key) ──────────────────────────
-
-class DeleteScansIn(BaseModel):
-    scan_ids: list[int]
-
-
-class DeleteHostsIn(BaseModel):
-    hostnames: list[str]
-
-
-@app.delete("/api/scans")
-def delete_scans(payload: DeleteScansIn, _: int = Depends(verify_read_key)):
-    with get_session() as session:
-        deleted = (
-            session.execute(
-                select(Scan).where(Scan.id.in_(payload.scan_ids))
-            ).scalars().all()
-        )
-        count = len(deleted)
-        for scan in deleted:
-            session.delete(scan)
-        session.commit()
-    return {"deleted": count}
-
-
-@app.delete("/api/hosts")
-def delete_hosts(payload: DeleteHostsIn, _: int = Depends(verify_read_key)):
-    with get_session() as session:
-        deleted = (
-            session.execute(
-                select(Scan).where(Scan.hostname.in_(payload.hostnames))
-            ).scalars().all()
-        )
-        count = len(deleted)
-        for scan in deleted:
-            session.delete(scan)
-        session.commit()
-    return {"deleted": count}
