@@ -9,9 +9,10 @@ import SeverityBar from "../components/SeverityBar";
 import SeverityBadge from "../components/SeverityBadge";
 import CategoryBadge from "../components/CategoryBadge";
 import StatusDot from "../components/StatusDot";
-import { SkeletonCard, SkeletonTable } from "../components/Skeleton";
+import { SkeletonCard, SkeletonTable, SkeletonBar } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import SeoHead from "../components/SeoHead";
 import { timeAgo, getAgentStatus } from "../lib/timeAgo";
 import { getSeverityColor } from "../lib/severity";
 
@@ -43,26 +44,34 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <SeoHead title="Dashboard" description="Overview of Shadow AI monitoring stats, recent hosts, and latest findings." />
+      <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-text-primary mb-1">Dashboard</h1>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {statsLoading ? (
           Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
         ) : (
           <>
-            <StatCard icon={Server} label="Total Hosts" value={stats?.total_hosts} />
-            <StatCard icon={FileWarning} label="Total Findings" value={stats?.total_findings} />
-            <StatCard icon={AlertTriangle} label="High Risk" value={stats?.high_risk} accent="red" />
-            <StatCard icon={AlertCircle} label="Medium Risk" value={stats?.medium_risk} accent="amber" />
-            <StatCard icon={Info} label="Low Risk" value={stats?.low_risk} accent="green" />
+            <StatCard icon={Server} label="Total Hosts" value={stats?.total_hosts} to="/hosts" />
+            <StatCard icon={FileWarning} label="Total Findings" value={stats?.total_findings} to="/findings" />
+            <StatCard icon={AlertTriangle} label="High Risk" value={stats?.high_risk} accent="red" to="/findings?severity=high" />
+            <StatCard icon={AlertCircle} label="Medium Risk" value={stats?.medium_risk} accent="amber" to="/findings?severity=medium" />
+            <StatCard icon={Info} label="Low Risk" value={stats?.low_risk} accent="green" to="/findings?severity=low" />
           </>
         )}
       </div>
 
       {/* Severity Bar */}
-      {!statsLoading && stats && (
+      {statsLoading ? (
         <div className="p-5 rounded-xl bg-bg-card border border-border">
-          <h3 className="text-sm font-semibold text-text-primary mb-3">Severity Distribution</h3>
+          <div className="skeleton h-4 w-36 mb-4" />
+          <SkeletonBar rows={3} />
+        </div>
+      ) : stats && (
+        <div className="p-5 rounded-xl bg-bg-card border border-border">
+          <h2 className="text-sm font-semibold text-text-primary mb-3">Severity Distribution</h2>
           <SeverityBar high={stats.high_risk} medium={stats.medium_risk} low={stats.low_risk} />
         </div>
       )}
@@ -72,7 +81,7 @@ export default function DashboardPage() {
         {/* Recent Hosts */}
         <div className="rounded-xl bg-bg-card border border-border overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-semibold text-text-primary">Recent Hosts</h3>
+            <h2 className="text-sm font-semibold text-text-primary">Recent Hosts</h2>
             <Link to="/hosts" className="text-xs font-medium text-accent hover:text-accent-hover transition-colors">
               View All <ArrowRight size={12} className="inline" />
             </Link>
@@ -118,7 +127,7 @@ export default function DashboardPage() {
         {/* Latest Findings */}
         <div className="rounded-xl bg-bg-card border border-border overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-semibold text-text-primary">Latest Findings</h3>
+            <h2 className="text-sm font-semibold text-text-primary">Latest Findings</h2>
             <Link to="/findings" className="text-xs font-medium text-accent hover:text-accent-hover transition-colors">
               View All <ArrowRight size={12} className="inline" />
             </Link>
@@ -152,5 +161,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

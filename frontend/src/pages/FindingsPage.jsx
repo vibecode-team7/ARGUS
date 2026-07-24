@@ -1,14 +1,17 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router";
-import { CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router";
+import { CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Download, Trash2 } from "lucide-react";
 import { useFindings } from "../hooks/useFindings";
 import { useHosts } from "../hooks/useHosts";
+import { deleteScans } from "../lib/api";
 import FilterBar from "../components/FilterBar";
 import SeverityBadge from "../components/SeverityBadge";
 import CategoryBadge from "../components/CategoryBadge";
 import Pagination from "../components/Pagination";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import ConfirmDialog from "../components/ConfirmDialog";
+import SeoHead from "../components/SeoHead";
 import { formatTimestamp } from "../lib/format";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
@@ -19,30 +22,21 @@ function escapeCsvValue(value) {
 }
 
 export default function FindingsPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Read filters from URL
+  // Derive all state from URL search params (single source of truth)
   const hostnameFilter = searchParams.get("hostname") ?? "";
   const severityFilter = searchParams.get("severity") ?? "";
-  const pageParam = parseInt(searchParams.get("page") ?? "1", 10);
-  const limitParam = parseInt(searchParams.get("limit") ?? "50", 10);
+  const page = parseInt(searchParams.get("page") ?? "1", 10);
+  const limit = parseInt(searchParams.get("limit") ?? "50", 10);
 
-  const [page, setPage] = useState(pageParam);
-  const [limit, setLimit] = useState(limitParam);
   const [sortKey, setSortKey] = useState("detected_at");
   const [sortDir, setSortDir] = useState("desc");
-
-  // Sync URL params
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    if (hostnameFilter) params.set("hostname", hostnameFilter);
-    else params.delete("hostname");
-    if (severityFilter) params.set("severity", severityFilter);
-    else params.delete("severity");
-    params.set("page", String(page));
-    params.set("limit", String(limit));
-    setSearchParams(params, { replace: true });
-  }, [hostnameFilter, severityFilter, page, limit, setSearchParams, searchParams]);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [selectedScanIds, setSelectedScanIds] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const selectAllRef = useRef(null);
 
   const offset = (page - 1) * limit;
 
@@ -56,7 +50,6 @@ export default function FindingsPage() {
   const { data: hosts } = useHosts();
   const hostnames = useMemo(() => (hosts ?? []).map((h) => h.hostname).sort(), [hosts]);
 
-  const scans = data?.scans ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -64,6 +57,7 @@ export default function FindingsPage() {
   // The API can return the same scan more than once when filtering by
   // severity (it fans out on the findings join), so dedupe by scan id first.
   const allFindings = useMemo(() => {
+    const scans = data?.scans ?? [];
     const seenScans = new Set();
     const uniqueScans = scans.filter((scan) => {
       if (seenScans.has(scan.id)) return false;
@@ -73,7 +67,7 @@ export default function FindingsPage() {
     return uniqueScans.flatMap((scan) =>
       scan.findings.map((f) => ({ ...f, scan }))
     );
-  }, [scans]);
+  }, [data?.scans]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -95,6 +89,46 @@ export default function FindingsPage() {
       return 0;
     });
   }, [allFindings, sortKey, sortDir]);
+
+  // Unique scan IDs on the current page (after sort)
+  const pageScanIds = useMemo(
+    () => [...new Set(sorted.map((f) => f.scan.id))],
+    [sorted]
+  );
+
+  const allPageSelected =
+    pageScanIds.length > 0 && pageScanIds.every((id) => selectedScanIds.has(id));
+  const somePageSelected = pageScanIds.some((id) => selectedScanIds.has(id));
+
+  // Update indeterminate state on the Select All checkbox
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  const toggleScanSelection = useCallback((scanId) => {
+    setSelectedScanIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(scanId)) next.delete(scanId);
+      else next.add(scanId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    const pageSet = new Set(pageScanIds);
+    setSelectedScanIds((prev) => {
+      const allOn = [...pageSet].every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allOn) {
+        for (const id of pageSet) next.delete(id);
+      } else {
+        for (const id of pageSet) next.add(id);
+      }
+      return next;
+    });
+  }, [pageScanIds]);
 
   const toggleSort = useCallback((key) => {
     setSortKey((prev) => {
@@ -138,35 +172,73 @@ export default function FindingsPage() {
     URL.revokeObjectURL(url);
   }, [sorted]);
 
+  // Helper to update URL params and reset to page 1 on filter change
+  const updateFilters = useCallback((updates) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [key, value] of Object.entries(updates)) {
+        if (value) next.set(key, value);
+        else next.delete(key);
+      }
+      // Reset to page 1 when filters change (unless page is being explicitly set)
+      if (!("page" in updates)) {
+        next.set("page", "1");
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handlePageChange = useCallback((newPage) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", String(newPage));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleLimitChange = useCallback((newLimit) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("limit", String(newLimit));
+      next.set("page", "1");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleClearFilters = useCallback(() => {
+    setSearchParams({}, { replace: true });
+  }, [setSearchParams]);
+
+  const clearSelected = useCallback(async () => {
+    setShowClearConfirm(false);
+    if (selectedScanIds.size === 0) return;
+    setDeleting(true);
+    try {
+      await deleteScans([...selectedScanIds]);
+      setSelectedScanIds(new Set());
+      refetch();
+    } catch (err) {
+      console.error("Failed to delete scans:", err);
+    } finally {
+      setDeleting(false);
+    }
+  }, [selectedScanIds, refetch]);
+
   if (error) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-4">
+    <>
+      <SeoHead title="Findings" description="Browse and filter detected Shadow AI tools across all endpoints." />
+      <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-text-primary mb-1">Findings</h1>
       {/* Filter Bar */}
       <FilterBar
         hostname={hostnameFilter}
         severity={severityFilter}
         hostnames={hostnames}
-        onHostnameChange={(v) => {
-          setPage(1);
-          setSearchParams((p) => {
-            if (v) p.set("hostname", v);
-            else p.delete("hostname");
-            return p;
-          });
-        }}
-        onSeverityChange={(v) => {
-          setPage(1);
-          setSearchParams((p) => {
-            if (v) p.set("severity", v);
-            else p.delete("severity");
-            return p;
-          });
-        }}
-        onClear={() => {
-          setPage(1);
-          setSearchParams({});
-        }}
+        onHostnameChange={(v) => updateFilters({ hostname: v })}
+        onSeverityChange={(v) => updateFilters({ severity: v })}
+        onClear={handleClearFilters}
       />
 
       {/* Page size selector */}
@@ -186,14 +258,25 @@ export default function FindingsPage() {
             <Download size={16} />
             Export CSV
           </button>
+          <button
+            type="button"
+            onClick={() => setShowClearConfirm(true)}
+            disabled={loading || selectedScanIds.size === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-bg-card px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:text-danger hover:border-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 size={16} />
+            {selectedScanIds.size === 0
+              ? "Clear History"
+              : `Clear (${selectedScanIds.size})`}
+          </button>
           <label htmlFor="page-size" className="text-xs text-text-muted">Scans per page:</label>
           <select
             id="page-size"
             value={limit}
-            onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+            onChange={(e) => handleLimitChange(Number(e.target.value))}
             className="px-2 py-1 rounded-lg text-xs
               bg-bg-input border border-border text-text-primary
-              hover:border-border-hover focus:border-accent focus:outline-none
+              hover:border-border-hover focus:border-border-hover focus:outline-none focus-visible:outline-none
               transition-colors cursor-pointer"
           >
             {PAGE_SIZE_OPTIONS.map((n) => (
@@ -208,6 +291,16 @@ export default function FindingsPage() {
         <table className="w-full text-sm" aria-label="Findings list">
           <thead>
             <tr className="border-b border-border bg-bg-secondary">
+              <th className="px-4 py-3 w-10">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={toggleSelectAll}
+                  className="accent-accent cursor-pointer"
+                  aria-label="Select all scans on this page"
+                />
+              </th>
               {[
                 { key: "scan_id", label: "Scan ID" },
                 { key: "hostname", label: "Hostname" },
@@ -246,7 +339,7 @@ export default function FindingsPage() {
               ))
             ) : sorted.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <EmptyState
                     icon={XCircle}
                     title="No findings match your filters"
@@ -259,8 +352,17 @@ export default function FindingsPage() {
                 <tr
                   key={`${f.scan.id}-${f.id}`}
                   className="border-b border-border last:border-0 hover:bg-bg-secondary transition-colors cursor-pointer"
-                  onClick={() => window.location.href = `/findings/${f.scan.id}`}
+                  onClick={() => navigate(`/findings/${f.scan.id}`)}
                 >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedScanIds.has(f.scan.id)}
+                      onChange={() => toggleScanSelection(f.scan.id)}
+                      className="accent-accent cursor-pointer"
+                      aria-label={`Select scan #${f.scan.id}`}
+                    />
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-text-secondary">#{f.scan.id}</td>
                   <td className="px-4 py-3 font-medium text-text-primary">{f.scan.hostname}</td>
                   <td className="px-4 py-3 font-medium text-text-primary">{f.name}</td>
@@ -309,9 +411,20 @@ export default function FindingsPage() {
           sorted.map((f) => (
             <div
               key={`${f.scan.id}-${f.id}`}
-              onClick={() => window.location.href = `/findings/${f.scan.id}`}
+              onClick={() => navigate(`/findings/${f.scan.id}`)}
               className="p-4 rounded-xl bg-bg-card border border-border cursor-pointer hover:shadow-md transition-shadow"
             >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedScanIds.has(f.scan.id)}
+                    onChange={() => toggleScanSelection(f.scan.id)}
+                    className="accent-accent cursor-pointer"
+                    aria-label={`Select scan #${f.scan.id}`}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-medium text-text-primary truncate">{f.name}</span>
@@ -335,23 +448,37 @@ export default function FindingsPage() {
                     <XCircle size={12} /> Not detected
                   </span>
                 )}
-                <span>{formatTimestamp(f.detected_at)}</span>
+                  <span>{formatTimestamp(f.detected_at)}</span>
+                </div>
+              </div>
               </div>
             </div>
           ))
         )}
       </div>
 
+      {/* Clear History confirmation */}
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="Delete Selected Scans?"
+        message={`This will permanently delete ${selectedScanIds.size} scan${selectedScanIds.size !== 1 ? "s" : ""} and all associated findings from the database. This action cannot be undone.`}
+        confirmLabel={deleting ? "Deleting…" : `Delete ${selectedScanIds.size}`}
+        onConfirm={clearSelected}
+        onCancel={() => setShowClearConfirm(false)}
+        variant="danger"
+      />
+
       {/* Pagination */}
-      {!loading && (
+      {!loading && total > 0 && (
         <Pagination
           page={page}
           totalPages={totalPages}
           total={total}
           limit={limit}
-          onPageChange={setPage}
+          onPageChange={handlePageChange}
         />
       )}
     </div>
+    </>
   );
 }

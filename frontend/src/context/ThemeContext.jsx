@@ -1,60 +1,42 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 const ThemeContext = createContext(undefined);
 
 const STORAGE_KEY = "argus-theme";
 
-/**
- * @returns {"system" | "light" | "dark"}
- */
 function getStoredTheme() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark" || stored === "system") {
+    if (stored === "light" || stored === "dark") {
       return stored;
     }
   } catch {
     /* localStorage unavailable */
   }
-  return "system";
+  return "light";
 }
 
 /**
- * Resolve "system" to an actual "light" or "dark" based on OS preference.
+ * Apply the .dark class on <html> without triggering layout transitions
+ * by temporarily disabling them via a utility class.
  */
-function resolveSystemTheme() {
-  if (typeof window !== "undefined" && window.matchMedia) {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  }
-  return "light";
+function applyTheme(isDark) {
+  const html = document.documentElement;
+  html.classList.add("disable-transitions");
+  html.classList.toggle("dark", isDark);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      html.classList.remove("disable-transitions");
+    });
+  });
 }
 
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(getStoredTheme);
-  const [resolved, setResolved] = useState(() =>
-    mode === "system" ? resolveSystemTheme() : mode
-  );
 
-  // Apply .dark class on <html> and resolve system mode
+  // Apply .dark class on <html>
   useEffect(() => {
-    const html = document.documentElement;
-
-    if (mode === "system") {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = (e) => {
-        const next = e.matches ? "dark" : "light";
-        setResolved(next);
-        html.classList.toggle("dark", next === "dark");
-      };
-      handler(mq);
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    }
-
-    setResolved(mode);
-    html.classList.toggle("dark", mode === "dark");
+    applyTheme(mode === "dark");
   }, [mode]);
 
   // Persist to localStorage
@@ -66,16 +48,12 @@ export function ThemeProvider({ children }) {
     }
   }, [mode]);
 
-  const cycleTheme = () => {
-    setMode((prev) => {
-      if (prev === "system") return "light";
-      if (prev === "light") return "dark";
-      return "system";
-    });
-  };
+  const cycleTheme = useCallback(() => {
+    setMode((prev) => (prev === "light" ? "dark" : "light"));
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ mode, resolved, cycleTheme }}>
+    <ThemeContext.Provider value={{ mode, cycleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

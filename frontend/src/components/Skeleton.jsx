@@ -43,3 +43,13 @@ export function SkeletonTable({ rows = 5 }) {
 export function SkeletonText({ width = "w-full" }) {
   return <div className={`skeleton h-4 ${width}`} />;
 }
+
+export function SkeletonBar({ rows = 3 }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="skeleton h-3 w-full rounded-full" />
+      ))}
+    </div>
+  );
+}

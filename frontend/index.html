@@ -2,13 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self';" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ARGUS — Shadow AI monitoring dashboard for enterprise endpoint security." />
+
+    <!-- Primary Meta Tags -->
+    <title>ARGUS — Shadow AI Monitoring Dashboard</title>
+    <meta name="title" content="ARGUS — Shadow AI Monitoring Dashboard" />
+    <meta name="description" content="ARGUS (AI Risk &amp; Governance Unauthorized-endpoint Scanner) detects and monitors Shadow AI tools across enterprise endpoints in real time." />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://argus-scanner.app" />
+    <meta property="og:title" content="ARGUS — Shadow AI Monitoring Dashboard" />
+    <meta property="og:description" content="Detect and monitor unauthorized AI tools across enterprise endpoints with ARGUS." />
+    <meta property="og:image" content="/og-image.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="ARGUS — Shadow AI Monitoring Dashboard" />
+    <meta property="twitter:description" content="Detect and monitor unauthorized AI tools across enterprise endpoints with ARGUS." />
+    <meta property="twitter:image" content="/og-image.png" />
+
+    <!-- Canonical URL -->
+    <!-- nosemgrep: html.security.audit.missing-integrity.missing-integrity -->
+    <link rel="canonical" href="https://argus-scanner.app" />
+
+    <!-- Theme Color -->
     <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
-    <title>ARGUS — Shadow AI Dashboard</title>
   </head>
+
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

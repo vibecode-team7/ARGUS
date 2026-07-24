@@ -6,6 +6,7 @@ import CategoryBadge from "../components/CategoryBadge";
 import { SkeletonCard, SkeletonText } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import SeoHead from "../components/SeoHead";
 import { formatTimestamp, formatUptime } from "../lib/format";
 function getOsIcon(os) {
   if (os === "darwin") return Laptop;
@@ -26,6 +27,24 @@ export default function ScanDetailPage() {
         <div className="p-5 rounded-xl bg-bg-card border border-border space-y-3">
           <SkeletonText width="w-48" />
           <SkeletonText width="w-64" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border">
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-28" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-24" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-20" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="skeleton h-3 w-16" />
+              <div className="skeleton h-4 w-28" />
+            </div>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SkeletonCard />
@@ -47,7 +66,9 @@ export default function ScanDetailPage() {
   const OsIcon = getOsIcon(scan.os);
 
   return (
-    <div className="space-y-6">
+    <>
+      <SeoHead title={`Scan #${scan.id}`} description={`Details from scan #${scan.id} on ${scan.hostname}.`} />
+      <div className="space-y-6">
       {/* Breadcrumb */}
       <Link
         to="/findings"
@@ -62,10 +83,10 @@ export default function ScanDetailPage() {
         <div className="flex flex-wrap items-start gap-4">
           <OsIcon size={32} className="text-text-muted mt-1" />
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-text-primary mb-1">
+            <h1 className="text-xl font-bold text-text-primary mb-1">
               Scan #{scan.id}
               <span className="ml-3 text-base font-normal text-text-secondary">{scan.hostname}</span>
-            </h2>
+            </h1>
             <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-bg-secondary text-xs font-medium">
                 {scan.os} {scan.os_version}
@@ -147,5 +168,6 @@ export default function ScanDetailPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

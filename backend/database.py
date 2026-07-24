@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from sqlalchemy import (
     create_engine, Column, Integer, String, Boolean,
-    Text, DateTime, ForeignKey, func, text
+    Text, DateTime, ForeignKey, UniqueConstraint, func, text
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, Session
 
@@ -36,6 +36,9 @@ class ApiKey(Base):
 
 class Scan(Base):
     __tablename__ = "scans"
+    __table_args__ = (
+        UniqueConstraint("hostname", "scanned_at", name="uq_scan_hostname_scanned_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     hostname = Column(String(255), nullable=False, index=True)
@@ -86,6 +89,13 @@ MIGRATIONS = [
     },
 ]
 
+INDEX_MIGRATIONS = [
+    {
+        "name": "ix_scans_hostname_scanned_at",
+        "sql": "CREATE UNIQUE INDEX IF NOT EXISTS ix_scans_hostname_scanned_at ON scans(hostname, scanned_at)",
+    },
+]
+
 
 def _get_columns(conn, table_name: str) -> set[str]:
     # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
@@ -122,9 +132,17 @@ def _migrate():
             conn.commit()
 
 
+def _migrate_indexes():
+    with engine.connect() as conn:
+        for idx in INDEX_MIGRATIONS:
+            conn.execute(text(idx["sql"]))
+        conn.commit()
+
+
 def init_db():
     Base.metadata.create_all(engine)
     _migrate()
+    _migrate_indexes()
 
 
 def get_session():

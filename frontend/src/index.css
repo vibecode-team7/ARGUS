@@ -100,8 +100,17 @@
 }
 
 /* ── Global Styles ─────────────────────────────────────────── */
-* {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+
+/*
+ * Theme transitions are applied selectively via Tailwind's transition-colors
+ * on interactive elements rather than the universal selector, which caused
+ * jank when thousands of elements recalculated simultaneously on theme toggle.
+ */
+
+/* Suppress all transitions during theme switches to prevent layout thrashing */
+.disable-transitions,
+.disable-transitions * {
+  transition: none !important;
 }
 
 body {
