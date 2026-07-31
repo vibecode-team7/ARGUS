@@ -33,7 +33,7 @@ jobs:
     continue-on-error: true # ch-8: remove to enforce
     steps:
       # CHANGED: Pinned actions/checkout to full SHA for supply-chain security
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0 # full history so gitleaks scans past commits too
       - name: gitleaks (secrets scan)
@@ -54,7 +54,7 @@ jobs:
     continue-on-error: true # ch-8: remove to enforce
     steps:
       # CHANGED: Pinned actions/checkout to full SHA
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       # CHANGED: Pinned actions/setup-python to full SHA
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -77,7 +77,7 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.12"
@@ -94,7 +94,7 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       # ADDED: Build Docker image for scanning
       - name: Build Docker image (backend)
         run: cd backend && docker build -t argus-backend:scan .
